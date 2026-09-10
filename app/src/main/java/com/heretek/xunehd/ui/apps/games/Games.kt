@@ -310,7 +310,7 @@ fun SolitaireApp() {
                         verticalArrangement = Arrangement.spacedBy((-14).dp),
                     ) {
                         tab.cards.forEach { card ->
-                            CardView(card) { tapTab(c) }
+                            SolCardView(card) { tapTab(c) }
                         }
                     }
                 }
@@ -320,7 +320,7 @@ fun SolitaireApp() {
                 founds.forEach { f ->
                     Box(Modifier.size(width = 40.dp, height = 56.dp).background(colors.elevated).padding(2.dp)) {
                         val top = f.cards.lastOrNull()
-                        if (top != null) CardView(top) {}
+                        if (top != null) SolCardView(top) {}
                     }
                 }
             }
@@ -329,7 +329,7 @@ fun SolitaireApp() {
 }
 
 @Composable
-private fun CardView(card: SolCard, onClick: () -> Unit) {
+fun SolCardView(card: SolCard, onClick: () -> Unit) {
     val colors = LocalXuneColors.current
     val bg = if (card.faceUp) Color.White else colors.tile
     val fg = if (card.suit.red) colors.accent else Color.White

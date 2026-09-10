@@ -10,12 +10,27 @@ import com.heretek.xunehd.media.PlaybackController
 import com.heretek.xunehd.ui.apps.CalcEngine
 import com.heretek.xunehd.ui.apps.ChordData
 import com.heretek.xunehd.ui.apps.QuizEngine
+import com.heretek.xunehd.ui.apps.games.CheckersColor
+import com.heretek.xunehd.ui.apps.games.CheckersEngine
+import com.heretek.xunehd.ui.apps.games.CheckersPiece
+import com.heretek.xunehd.ui.apps.games.CheckersState
+import com.heretek.xunehd.ui.apps.games.ChessColor
+import com.heretek.xunehd.ui.apps.games.ChessEngine
+import com.heretek.xunehd.ui.apps.games.ChessPiece
+import com.heretek.xunehd.ui.apps.games.ChessPieceType
+import com.heretek.xunehd.ui.apps.games.ChessState
+import com.heretek.xunehd.ui.apps.games.HeartsEngine
+import com.heretek.xunehd.ui.apps.games.HeartsSeat
+import com.heretek.xunehd.ui.apps.games.HeartsState
 import com.heretek.xunehd.ui.apps.games.HexColor
 import com.heretek.xunehd.ui.apps.games.HexicEngine
+import com.heretek.xunehd.ui.apps.games.PokerEngine
 import com.heretek.xunehd.ui.apps.games.ReversiEngine
 import com.heretek.xunehd.ui.apps.games.SolCard
 import com.heretek.xunehd.ui.apps.games.SolSuit
 import com.heretek.xunehd.ui.apps.games.SolitaireEngine
+import com.heretek.xunehd.ui.apps.games.SpadesEngine
+import com.heretek.xunehd.ui.apps.games.SpadesSeat
 import com.heretek.xunehd.ui.apps.games.SudokuEngine
 import com.heretek.xunehd.ui.screens.formatDial
 import com.heretek.xunehd.ui.screens.formatTime
@@ -246,5 +261,113 @@ class LogicTest {
         assertEquals(ReversiEngine.BLACK, next[move.first][move.second])
         val (bScore, wScore) = ReversiEngine.score(next)
         assertTrue("expected flipped count > 4, got ${bScore + wScore}", (bScore + wScore) > 4)
+    }
+
+    /* ============ Phase 7 — More games ============ */
+
+    @Test
+    fun `hearts legalPlays must follow suit when led`() {
+        val state = HeartsState(
+            hands = mapOf(
+                HeartsSeat.SOUTH to listOf(SolCard(SolSuit.HEART, 5, true), SolCard(SolSuit.SPADE, 10, true)),
+                HeartsSeat.NORTH to emptyList(),
+                HeartsSeat.EAST to emptyList(),
+                HeartsSeat.WEST to emptyList(),
+            ),
+            trick = listOf(HeartsSeat.WEST to SolCard(SolSuit.HEART, 7, true)),
+            ledSuit = SolSuit.HEART,
+            passDirection = 0,
+            currentPlayer = HeartsSeat.SOUTH,
+            scores = HeartsEngine.heartsSeats.associateWith { 0 },
+            heartsBroken = true,
+            done = false,
+            lastTrick = null,
+            pendingPassFrom = null,
+        )
+        val legal = HeartsEngine.legalPlays(state, HeartsSeat.SOUTH)
+        assertEquals(1, legal.size)
+        assertEquals(SolSuit.HEART, legal.first().suit)
+    }
+
+    @Test
+    fun `hearts cannot lead hearts before they are broken`() {
+        val state = HeartsState(
+            hands = mapOf(
+                HeartsSeat.SOUTH to listOf(SolCard(SolSuit.HEART, 7, true), SolCard(SolSuit.CLUB, 2, true)),
+                HeartsSeat.NORTH to emptyList(), HeartsSeat.EAST to emptyList(), HeartsSeat.WEST to emptyList(),
+            ),
+            trick = emptyList(),
+            ledSuit = null,
+            passDirection = 0,
+            currentPlayer = HeartsSeat.SOUTH,
+            scores = HeartsEngine.heartsSeats.associateWith { 0 },
+            heartsBroken = false,
+            done = false,
+            lastTrick = null,
+            pendingPassFrom = null,
+        )
+        val legal = HeartsEngine.legalPlays(state, HeartsSeat.SOUTH)
+        assertEquals(1, legal.size)
+        assertEquals(SolSuit.CLUB, legal.first().suit)
+    }
+
+    @Test
+    fun `spades bid legality assigns bids to seats in order`() {
+        var s = SpadesEngine.newGame()
+        s = SpadesEngine.bid(s, 3)
+        s = SpadesEngine.bid(s, 4)
+        s = SpadesEngine.bid(s, 5)
+        s = SpadesEngine.bid(s, 2)
+        assertEquals(3, s.bids[SpadesSeat.WEST])
+        assertEquals(4, s.bids[SpadesSeat.NORTH])
+        assertEquals(5, s.bids[SpadesSeat.EAST])
+        assertEquals(2, s.bids[SpadesSeat.SOUTH])
+        assertTrue(s.biddingDone)
+    }
+
+    @Test
+    fun `checkers mandatory capture wins when available`() {
+        // RED at (2,1), BLACK at (3,2) → RED captures down-right to (4,3). Single capture only.
+        val setup = CheckersState(
+            board = Array(8) { arrayOfNulls<CheckersPiece?>(8) },
+            turn = CheckersColor.RED,
+            captureChain = null, winner = null,
+        )
+        setup.board[2][1] = com.heretek.xunehd.ui.apps.games.checkersPiece(CheckersColor.RED, false)
+        setup.board[3][2] = com.heretek.xunehd.ui.apps.games.checkersPiece(CheckersColor.BLACK, false)
+        val moves = CheckersEngine.legalMoves(setup, CheckersColor.RED)
+        assertEquals(1, moves.size)
+        assertTrue(moves.any { it.second == (4 to 3) })
+        val after = CheckersEngine.apply(setup, 2 to 1, 4 to 3)
+        assertNull(after.board[3][2])
+    }
+
+    @Test
+    fun `chess detects check and legal move filtering`() {
+        // Black queen on (4,4) gives check to the white king on (7,7).
+        val b = Array(8) { arrayOfNulls<ChessPiece?>(8) }
+        b[7][7] = ChessPiece(ChessPieceType.K, ChessColor.WHITE)
+        b[4][4] = ChessPiece(ChessPieceType.Q, ChessColor.BLACK)
+        val s = ChessState(b, ChessColor.WHITE, 0, null, 0, 1, "")
+        assertTrue(ChessEngine.isInCheck(s, ChessColor.WHITE))
+        val legal = ChessEngine.legalMoves(s)
+        // Every legal move must leave the king not in check.
+        assertTrue(legal.all { mv -> !ChessEngine.isInCheck(ChessEngine.apply(s, mv), ChessColor.WHITE) })
+    }
+
+    @Test
+    fun `poker evaluator ranks hands correctly`() {
+        val royalFlush = listOf(SolCard(SolSuit.HEART, 10, true), SolCard(SolSuit.HEART, 11, true), SolCard(SolSuit.HEART, 12, true), SolCard(SolSuit.HEART, 13, true), SolCard(SolSuit.HEART, 14, true), SolCard(SolSuit.SPADE, 2, true), SolCard(SolSuit.CLUB, 3, true))
+        val quads = listOf(SolCard(SolSuit.SPADE, 2, true), SolCard(SolSuit.HEART, 2, true), SolCard(SolSuit.CLUB, 2, true), SolCard(SolSuit.DIAMOND, 2, true), SolCard(SolSuit.SPADE, 5, true), SolCard(SolSuit.HEART, 9, true), SolCard(SolSuit.CLUB, 13, true))
+        val fullHouse = listOf(SolCard(SolSuit.SPADE, 10, true), SolCard(SolSuit.HEART, 10, true), SolCard(SolSuit.CLUB, 10, true), SolCard(SolSuit.DIAMOND, 4, true), SolCard(SolSuit.SPADE, 4, true), SolCard(SolSuit.HEART, 8, true), SolCard(SolSuit.CLUB, 7, true))
+        val straight = listOf(SolCard(SolSuit.SPADE, 5, true), SolCard(SolSuit.HEART, 6, true), SolCard(SolSuit.CLUB, 7, true), SolCard(SolSuit.DIAMOND, 8, true), SolCard(SolSuit.SPADE, 9, true), SolCard(SolSuit.HEART, 2, true), SolCard(SolSuit.CLUB, 3, true))
+        val (royal, _) = PokerEngine.scoreHand(royalFlush)
+        val (quadsR, _) = PokerEngine.scoreHand(quads)
+        val (fh, _) = PokerEngine.scoreHand(fullHouse)
+        val (str, _) = PokerEngine.scoreHand(straight)
+        assertEquals("royal flush should be category 9", 9, royal)
+        assertEquals("quads should be category 8", 8, quadsR)
+        assertEquals("full house should be category 7", 7, fh)
+        assertEquals("straight should be category 5", 5, str)
     }
 }

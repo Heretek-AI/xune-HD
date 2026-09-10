@@ -73,7 +73,7 @@ object OfficialCatalog {
         OfficialApp("Stopwatch", "StopWatch.exe", UTILITIES, "Stopwatch with laps.", "stopwatch"),
         OfficialApp("Sudoku", "Sudoku.exe", GAMES, "Solve Sudoku by filling all rows and columns.", "sudoku"),
         OfficialApp("SuperNova", "Supernova.exe", GAMES, "Chain supernovas for a high score."),
-        OfficialApp("Texas Hold Em", "Holdem.exe", GAMES, "Last player holding chips wins."),
+        OfficialApp("Texas Hold Em", "Holdem.exe", GAMES, "Last player holding chips wins.", "texasholdem"),
         OfficialApp("Tiki Totems", "TikiTotems.exe", GAMES, "Appease the Tiki Gods."),
         OfficialApp("Tiles", "Tiles.exe", GAMES, "Classic tile-matching puzzle."),
         OfficialApp("Trash Throw", "TrashThrow.exe", GAMES, "The perfect time waster."),
