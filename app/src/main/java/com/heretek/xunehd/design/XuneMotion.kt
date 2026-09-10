@@ -22,3 +22,4 @@ object XuneMotion {
     fun <T> depth() = tween<T>(DEPTH_MS, easing = Decelerate)
     fun <T> instant() = tween<T>(1, easing = LinearEasing)
 }
+

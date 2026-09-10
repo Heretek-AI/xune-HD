@@ -96,6 +96,21 @@ fun CroppedHeader(
             overflow = TextOverflow.Clip,
             modifier = Modifier.offset(y = (visibleHeight - fontSize).coerceAtLeast(0.dp)),
         )
+        // Faint right-edge back arrow — mirrors the device's explicit
+        // back affordance on Now Playing (canon §3.4). Equivalently the
+        // user may tap the cropped header text.
+        BasicText(
+            text = "<-",
+            style = TextStyle(
+                fontFamily = Selawik,
+                fontSize = XuneTokens.TYPE_NOW_META.sp,
+                color = colors.accent.copy(alpha = 0.6f),
+            ),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = XuneTokens.EDGE.dp)
+                .offset(y = (visibleHeight - XuneTokens.TYPE_NOW_META.dp).coerceAtLeast(0.dp) / 2),
+        )
     }
 }
 

@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.heretek.xunehd.design.LocalXuneColors
+import com.heretek.xunehd.design.XuneMotion
 import com.heretek.xunehd.design.XuneTokens
 import com.heretek.xunehd.design.components.AlbumArt
 import com.heretek.xunehd.design.components.CrossbarBar

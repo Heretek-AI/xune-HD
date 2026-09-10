@@ -60,4 +60,7 @@ object XuneTokens {
 
     // Drag thresholds (px in device-mode design units).
     const val SKIP_DRAG_PX = 24
+
+    // Now Playing idle behavior (canon §4).
+    const val IDLE_SCREENSAVER_MS = 5_000L
 }

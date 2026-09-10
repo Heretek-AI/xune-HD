@@ -57,16 +57,27 @@ the functional entries are `music` and `settings`; future pivots may join.
   slides horizontally beneath the fixed crossbar.
 - Lists scroll vertically: textual (artists, genres) or grid (albums).
 
-### 3.4 Back gesture = tap the cut-off header
+### 3.4 Back gesture = tap the cut-off header (and the screen-edge back arrow)
 - There is no hardware back. The **partially visible top-of-screen heading**
   (e.g. the bottom of "SETT" on the Settings screen) is the back button
   (ZDNet Quick Start Guide discovery; Gizmodo confirms).
-- Now Playing is the exception: it shows an explicit left-arrow back button
-  (Gizmodo).
+- Now Playing is the device's documented exception: it shows an explicit
+  left-arrow back button (Gizmodo). Xune-HD preserves this.
+- Xune-HD additionally places a faint back arrow at the right edge of the
+  cropped header on every detail screen, so the affordance is also visible
+  to users who never realize the cropped text is tappable. The arrow and the
+  cropped text are equivalent back actions; the cropped text remains the
+  canon-correct wayfinding signature.
 
 ### 3.5 Alphabet jump
-- In long lists, faint letters run alongside the list (SlashGear).
-- Tap any letter → a full A–Z index pops up → pick a letter to jump.
+- A **separated rail of faint letters** runs along the right edge of long
+  lists. Tap any letter → a full A–Z index pops up → pick a letter to jump
+  to the first row whose label begins with that letter.
+- This is the same right-edge rail the device shipped; earlier descriptions
+  described an "inline" placement (letters among the rows). Inline placement
+  was widely reported as a mis-tap hazard (Gizmodo: "I've accidentally hit a
+  letter when I meant to hit an artist"); the separated rail is the
+  canon-correct affordance.
 
 ### 3.6 Apps (marketplace)
 - Official apps and games were delivered exclusively through the **Apps

@@ -21,7 +21,10 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -30,11 +33,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.heretek.xunehd.XuneGraph
 import com.heretek.xunehd.design.LocalXuneColors
+import com.heretek.xunehd.media.PlaybackController
 import com.heretek.xunehd.design.XuneTokens
 import com.heretek.xunehd.design.components.AlbumArt
 import com.heretek.xunehd.design.components.EdgeCropText
 import com.heretek.xunehd.design.components.HomeMenuItem
+import com.heretek.xunehd.design.components.KineticList
 import com.heretek.xunehd.design.components.StaggerEntrance
+import com.heretek.xunehd.design.components.firstLetterOf
 import com.heretek.xunehd.data.model.PinKind
 import com.heretek.xunehd.data.repo.QuickplayCard
 import com.heretek.xunehd.ui.LocalXuneGraph
@@ -42,13 +48,15 @@ import com.heretek.xunehd.ui.components.LocalContextMenu
 import com.heretek.xunehd.ui.components.SectionLabel
 import com.heretek.xunehd.ui.nav.XuneDestination
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
  * The Zune HD home: two pages side by side. The home text menu sits on the
  * right; Quickplay is parked to its left ("left and to the rear, in a bit of
- * visual 3D trickery" — canon §3.2): its content trails the page frame at
- * 0.6x and gains slight scale as it settles forward.
+ * visual 3D trickery" — canon §3.2). The 3D effect combines a slight
+ * rotationY (camera tilt) and a depth translation so the rear page appears
+ * to recede behind the front page, anchored at 0.6x the frame speed.
  */
 @Composable
 fun HomePages(canvasWidth: Dp) {
@@ -63,10 +71,13 @@ fun HomePages(canvasWidth: Dp) {
                 .graphicsLayer {
                     if (page == 0) {
                         translationX = behind * 0.4f * size.width
-                        val depth = 0.92f + 0.08f * (1f - behind)
+                        // 3D parallax: tilt the rear page so it appears angled away from the viewer.
+                        rotationY = -behind * 12f
+                        cameraDistance = 12f * density
+                        val depth = 0.94f + 0.06f * (1f - behind)
                         scaleX = depth
                         scaleY = depth
-                        alpha = 0.8f + 0.2f * (1f - behind)
+                        alpha = 0.85f + 0.15f * (1f - behind)
                     }
                 },
         ) {
@@ -75,47 +86,51 @@ fun HomePages(canvasWidth: Dp) {
     }
 }
 
+/** The home menu: 9 entries listed canonically, in a kinetic scrolling column. */
+private data class HomeEntry(val id: String, val label: String, val destination: XuneDestination)
+
+private val HOME_ENTRIES = listOf(
+    HomeEntry("music", "music", XuneDestination.Music),
+    HomeEntry("videos", "videos", XuneDestination.Videos),
+    HomeEntry("pictures", "pictures", XuneDestination.Pictures),
+    HomeEntry("radio", "radio", XuneDestination.Radio),
+    HomeEntry("marketplace", "marketplace", XuneDestination.Marketplace),
+    HomeEntry("social", "social", XuneDestination.Social),
+    HomeEntry("podcasts", "podcasts", XuneDestination.Podcasts),
+    HomeEntry("internet", "internet", XuneDestination.Internet),
+    HomeEntry("settings", "settings", XuneDestination.Settings),
+)
+
 @Composable
 fun HomeMenuScreen(canvasWidth: Dp) {
     val graph = LocalXuneGraph.current
-    Column(Modifier.fillMaxSize()) {
-        Spacer(Modifier.height(48.dp))
-        StaggerEntrance(index = 0) {
-            HomeMenuItem(label = "music", onClick = { graph.nav.push(XuneDestination.Music) })
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Spacer(Modifier.height(48.dp))
+            // The kinetic list of menu entries. The right-edge alphabet rail
+            // (canon §3.5) comes for free via KineticList.
+            KineticList(
+                items = HOME_ENTRIES,
+                key = { it.id },
+                letter = { firstLetterOf(it.label) },
+                modifier = Modifier.weight(1f),
+                rowContent = { entry, _ ->
+                    HomeMenuItem(
+                        label = entry.label,
+                        onClick = { graph.nav.push(entry.destination) },
+                    )
+                },
+            )
+            // Bottom watermark — canon §2 (textWatermark 0.08).
+            EdgeCropText(
+                text = "xune hd",
+                fontSize = XuneTokens.TYPE_CROSSBAR.dp,
+                alpha = 0.08f,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = XuneTokens.EDGE.dp, bottom = XuneTokens.EDGE.dp),
+            )
         }
-        StaggerEntrance(index = 1) {
-            HomeMenuItem(label = "videos", onClick = { graph.nav.push(XuneDestination.Videos) })
-        }
-        StaggerEntrance(index = 2) {
-            HomeMenuItem(label = "pictures", onClick = { graph.nav.push(XuneDestination.Pictures) })
-        }
-        StaggerEntrance(index = 3) {
-            HomeMenuItem(label = "radio", onClick = { graph.nav.push(XuneDestination.Radio) })
-        }
-        StaggerEntrance(index = 4) {
-            HomeMenuItem(label = "marketplace", onClick = { graph.nav.push(XuneDestination.Marketplace) })
-        }
-        StaggerEntrance(index = 5) {
-            HomeMenuItem(label = "social", onClick = { graph.nav.push(XuneDestination.Social) })
-        }
-        StaggerEntrance(index = 6) {
-            HomeMenuItem(label = "podcasts", onClick = { graph.nav.push(XuneDestination.Podcasts) })
-        }
-        StaggerEntrance(index = 7) {
-            HomeMenuItem(label = "internet", onClick = { graph.nav.push(XuneDestination.Internet) })
-        }
-        StaggerEntrance(index = 8) {
-            HomeMenuItem(label = "settings", onClick = { graph.nav.push(XuneDestination.Settings) })
-        }
-        Spacer(Modifier.weight(1f))
-        EdgeCropText(
-            text = "xune hd",
-            fontSize = XuneTokens.TYPE_CROSSBAR.dp,
-            alpha = 0.08f,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = XuneTokens.EDGE.dp, bottom = XuneTokens.EDGE.dp),
-        )
     }
 }
 
@@ -173,6 +188,13 @@ fun QuickplayScreen(canvasWidth: Dp) {
         }
 
         Spacer(Modifier.height(8.dp))
+        // Smart DJ lane (canon §4): tap "play mix" to queue a 25-track
+        // smart-DJ order — hearts first, broken skipped. This is the
+        // on-device manifestation of Smart DJ.
+        SectionLabel("smart dj")
+        SmartDjRow(graph, scope)
+
+        Spacer(Modifier.height(8.dp))
         SectionLabel("pins")
         QuickplayRow(graph, scope, cards = pins)
 
@@ -183,6 +205,48 @@ fun QuickplayScreen(canvasWidth: Dp) {
         Spacer(Modifier.height(8.dp))
         SectionLabel("new")
         NewRow()
+    }
+}
+
+/** Build and queue a Smart DJ mix on the controller. Pulls the full library,
+ *  sorts hearts-first / broken-skipped via [PlaybackController.smartShuffleOrder],
+ *  caps at 25 tracks. */
+@Composable
+private fun SmartDjRow(graph: XuneGraph, scope: CoroutineScope) {
+    val colors = LocalXuneColors.current
+    var building by remember { mutableStateOf(false) }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(XuneTokens.ROW_HEIGHT.dp)
+            .combinedClickable(
+                enabled = !building,
+                onClick = {
+                    building = true
+                    scope.launch {
+                        try {
+                            val tracks = graph.library.tracks().first()
+                            val ratings = graph.quickplay.ratings()
+                            val trackList = tracks.take(60)
+                            val current = graph.controller.nowPlaying.value
+                            val ordered = PlaybackController.smartShuffleOrder(trackList, ratings, current)
+                            val mix = ordered.take(25)
+                            if (mix.isNotEmpty()) graph.controller.play(mix, 0)
+                        } finally {
+                            building = false
+                        }
+                    }
+                },
+                onLongClick = {},
+            )
+            .padding(horizontal = XuneTokens.EDGE.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        EdgeCropText(
+            text = if (building) "building mix…" else "play smart dj mix",
+            fontSize = XuneTokens.TYPE_NOW_META.dp,
+            color = colors.accent,
+        )
     }
 }
 

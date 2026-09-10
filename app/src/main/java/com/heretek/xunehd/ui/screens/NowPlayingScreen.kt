@@ -74,7 +74,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private const val IDLE_SCREENSAVER_MS = 5_000L
 private const val SKIP_DRAG_THRESHOLD = XuneTokens.SKIP_DRAG_PX.toFloat()
 
 /**
@@ -106,7 +105,7 @@ fun NowPlayingScreen(canvasWidth: Dp) {
     // Idle → screensaver, exactly as the device does after a few seconds.
     LaunchedEffect(interactionKey, current?.mediaId, isPlaying) {
         if (current == null) return@LaunchedEffect
-        delay(IDLE_SCREENSAVER_MS)
+        delay(XuneTokens.IDLE_SCREENSAVER_MS)
         if (!overlay) screensaver = true
     }
 
@@ -134,8 +133,13 @@ fun NowPlayingScreen(canvasWidth: Dp) {
             .fillMaxSize()
             .clipToBounds()
             .pointerInput(overlay, screensaver) {
-                if (!overlay && !screensaver) {
-                    detectTapGestures(onTap = { overlay = true })
+                if (!overlay) {
+                    // Tap-to-show overlay: works whether the screensaver is up
+                    // (device combined dismiss + overlay) or not.
+                    detectTapGestures(onTap = {
+                        screensaver = false
+                        overlay = true
+                    })
                 }
             }
             .pointerInput(Unit) {
