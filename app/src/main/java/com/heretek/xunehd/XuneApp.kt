@@ -1,6 +1,11 @@
 package com.heretek.xunehd
 
 import android.app.Application
+import android.database.ContentObserver
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import com.heretek.xunehd.data.db.XuneDatabase
 import com.heretek.xunehd.data.repo.LibraryRepository
 import com.heretek.xunehd.data.repo.QuickplayRepository
@@ -11,6 +16,7 @@ import com.heretek.xunehd.ui.nav.XuneNav
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
@@ -73,6 +79,35 @@ class XuneApp : Application() {
         // Keep the artist-image service aware of the user's settings.
         settings.settings
             .onEach { artistImages.settingsSnapshot = it }
+            .launchIn(appScope)
+
+        // Opt-in MediaStore watcher (Settings > collection > watch media store).
+        // Debounced 2 s to coalesce bursts (e.g. mass-transfer).
+        var watcher: ContentObserver? = null
+        val handler = Handler(Looper.getMainLooper())
+        settings.settings
+            .onEach { cfg ->
+                val want = cfg.watchMediaStore
+                if (want && watcher == null) {
+                    val w = object : ContentObserver(handler) {
+                        override fun onChange(selfChange: Boolean, uri: Uri?) {
+                            appScope.launch {
+                                delay(2_000)
+                                library.refresh()
+                            }
+                        }
+                    }
+                    contentResolver.registerContentObserver(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        true,
+                        w,
+                    )
+                    watcher = w
+                } else if (!want && watcher != null) {
+                    contentResolver.unregisterContentObserver(watcher!!)
+                    watcher = null
+                }
+            }
             .launchIn(appScope)
 
         // First launch: build the collection from MediaStore.

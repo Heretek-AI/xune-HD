@@ -1,5 +1,7 @@
 package com.heretek.xunehd.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,9 +20,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.heretek.xunehd.BuildConfig
 import com.heretek.xunehd.design.LocalXuneColors
@@ -36,10 +42,29 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val graph = LocalXuneGraph.current
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val settings by graph.settingsFlow.collectAsState(initial = com.heretek.xunehd.data.repo.XuneSettings())
     val colors = LocalXuneColors.current
     val scanState by graph.library.scanning.collectAsState()
+    val importState by graph.library.importing.collectAsState()
+    val lastScanAt by graph.library.lastScanAt.collectAsState()
+    val lastScanResult by graph.library.lastScanResult.collectAsState()
+    val lastImportResult by graph.library.lastImportResult.collectAsState()
     val menus = com.heretek.xunehd.ui.components.LocalContextMenu.current
+    var trackCount by remember { mutableStateOf<Int?>(null) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { trackCount = graph.library.trackCount() }
+
+    // SAF tree picker → recursive import into the library.
+    val treeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                graph.settings.setImportedTreeUri(uri.toString())
+                graph.library.importTree(uri)
+            }
+        }
+    }
 
     DetailScaffold(title = "settings") {
         Column(
@@ -95,9 +120,35 @@ fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
 
             SectionLabel("collection")
             SettingsRow(
+                label = "library location",
+                subLabel = "${graph.library.databasePath()}\n${trackCount ?: "…"} tracks from MediaStore.Audio (all indexed audio on the device)",
+                onClick = {},
+            )
+            SettingsRow(
+                label = if (importState) "importing…" else "import music",
+                subLabel = if (settings.importedTreeUri.isBlank()) {
+                    "pick a folder — audio files will be added to the library"
+                } else {
+                    "imported: ${settings.importedTreeUri}"
+                },
+                onClick = { treeLauncher.launch(null) },
+            )
+            SettingsToggle(
+                label = "watch media store",
+                subLabel = "auto-rescan when files are added or removed",
+                value = settings.watchMediaStore,
+            ) { enabled ->
+                scope.launch { graph.settings.setWatchMediaStore(enabled) }
+            }
+            SettingsRow(
                 label = if (scanState) "scanning…" else "refresh collection",
                 subLabel = "rebuild the library from device media",
                 onClick = { scope.launch { graph.library.refresh() } },
+            )
+            SettingsRow(
+                label = "scan status",
+                subLabel = scanStatusText(lastScanAt, lastScanResult, lastImportResult),
+                onClick = {},
             )
 
             SectionLabel("about")
@@ -115,6 +166,28 @@ fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
             )
         }
     }
+}
+
+private fun scanStatusText(
+    lastScanAt: Long,
+    lastScanResult: com.heretek.xunehd.data.scan.MediaLibraryScanner.ScanResult?,
+    lastImportResult: com.heretek.xunehd.data.repo.LibraryRepository.ImportResult?,
+): String {
+    if (lastScanAt == 0L && lastImportResult == null) return "no scan yet"
+    val parts = mutableListOf<String>()
+    if (lastScanAt != 0L) parts += "media store: ${formatTimestamp(lastScanAt)}"
+    if (lastScanResult != null) parts += "scanned ${lastScanResult.scanned} · removed ${lastScanResult.removed}"
+    if (lastImportResult != null) {
+        parts += if (lastImportResult.ok) "imported ${lastImportResult.scanned}"
+        else "import error: ${lastImportResult.error}"
+    }
+    return parts.joinToString("\n")
+}
+
+private fun formatTimestamp(ms: Long): String {
+    if (ms == 0L) return "never"
+    val df = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+    return df.format(java.util.Date(ms))
 }
 
 @Composable

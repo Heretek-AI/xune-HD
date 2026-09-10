@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -88,7 +89,14 @@ fun XuneRoot() {
             com.heretek.xunehd.ui.components.LocalContextMenu provides menus,
         ) {
             DeviceCanvas(deviceMode = settings.deviceMode) { canvasWidth, canvasHeight ->
-                Box(Modifier.fillMaxSize()) {
+                // safeDrawingPadding reserves status-bar + navigation-bar + cutout
+                // space, so the top row of every screen is reachable and the
+                // MiniPlayer sits above the gesture bar.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding(),
+                ) {
                     NavHost(canvasWidth, canvasHeight)
                     Box(
                         Modifier
