@@ -3,6 +3,7 @@ package com.heretek.xunehd.ui.screens
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.heretek.xunehd.XuneGraph
@@ -43,14 +46,32 @@ import kotlinx.coroutines.launch
 
 /**
  * The Zune HD home: two pages side by side. The home text menu sits on the
- * right; Quickplay is parked to its left ("left and to the rear") and is
- * revealed by sliding the menu rightward.
+ * right; Quickplay is parked to its left ("left and to the rear, in a bit of
+ * visual 3D trickery" — canon §3.2): its content trails the page frame at
+ * 0.6x and gains slight scale as it settles forward.
  */
 @Composable
 fun HomePages(canvasWidth: Dp) {
     val pagerState = rememberPagerState(initialPage = 1, pageCount = { 2 })
     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-        if (page == 0) QuickplayScreen(canvasWidth) else HomeMenuScreen(canvasWidth)
+        val behind = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+            .coerceIn(0f, 1f)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clipToBounds()
+                .graphicsLayer {
+                    if (page == 0) {
+                        translationX = behind * 0.4f * size.width
+                        val depth = 0.92f + 0.08f * (1f - behind)
+                        scaleX = depth
+                        scaleY = depth
+                        alpha = 0.8f + 0.2f * (1f - behind)
+                    }
+                },
+        ) {
+            if (page == 0) QuickplayScreen(canvasWidth) else HomeMenuScreen(canvasWidth)
+        }
     }
 }
 
@@ -63,19 +84,28 @@ fun HomeMenuScreen(canvasWidth: Dp) {
             HomeMenuItem(label = "music", onClick = { graph.nav.push(XuneDestination.Music) })
         }
         StaggerEntrance(index = 1) {
-            HomeMenuItem(label = "settings", onClick = { graph.nav.push(XuneDestination.Settings) })
+            HomeMenuItem(label = "videos", onClick = { graph.nav.push(XuneDestination.Videos) })
         }
-        // The Zune HD carries entries for services we have not built; render
-        // them dim and inert, as the device does for missing services.
         StaggerEntrance(index = 2) {
-            EdgeCropText(
-                text = "podcasts",
-                fontSize = XuneTokens.TYPE_MENU_ITEM.dp,
-                alpha = 0.4f,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = XuneTokens.EDGE.dp, top = 10.dp, bottom = 10.dp),
-            )
+            HomeMenuItem(label = "pictures", onClick = { graph.nav.push(XuneDestination.Pictures) })
+        }
+        StaggerEntrance(index = 3) {
+            HomeMenuItem(label = "radio", onClick = { graph.nav.push(XuneDestination.Radio) })
+        }
+        StaggerEntrance(index = 4) {
+            HomeMenuItem(label = "marketplace", onClick = { graph.nav.push(XuneDestination.Marketplace) })
+        }
+        StaggerEntrance(index = 5) {
+            HomeMenuItem(label = "social", onClick = { graph.nav.push(XuneDestination.Social) })
+        }
+        StaggerEntrance(index = 6) {
+            HomeMenuItem(label = "podcasts", onClick = { graph.nav.push(XuneDestination.Podcasts) })
+        }
+        StaggerEntrance(index = 7) {
+            HomeMenuItem(label = "internet", onClick = { graph.nav.push(XuneDestination.Internet) })
+        }
+        StaggerEntrance(index = 8) {
+            HomeMenuItem(label = "settings", onClick = { graph.nav.push(XuneDestination.Settings) })
         }
         Spacer(Modifier.weight(1f))
         EdgeCropText(
@@ -250,5 +280,7 @@ private fun openCard(graph: XuneGraph, scope: CoroutineScope, card: QuickplayCar
         PinKind.ALBUM -> graph.nav.push(XuneDestination.Album(card.refId))
         PinKind.ARTIST -> graph.nav.push(XuneDestination.Artist(card.refId))
         PinKind.PLAYLIST -> graph.nav.push(XuneDestination.PlaylistDetail(card.refId))
+        PinKind.PICTURE -> Unit
+        PinKind.RADIO -> graph.nav.push(XuneDestination.Radio)
     }
 }

@@ -3,11 +3,14 @@ package com.heretek.xunehd
 import java.io.File
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
 /**
  * Design-invariant audit, ported from Not-Zune's approach. Scans the UI
  * sources for violations of the Zune HD canon (docs/zune-hd-ui-canon.md §7).
  */
+@RunWith(RobolectricTestRunner::class)
 class DesignInvariantTest {
 
     private val appDir: File
@@ -34,7 +37,7 @@ class DesignInvariantTest {
 
     @Test
     fun `screens consume tokens not raw colors`() {
-        val offenders = (sources("ui") + sources("design/components"))
+        val offenders = (sources("ui") + sources("design/components") + sources("ui/apps"))
             .flatMap { file ->
                 val text = file.readText()
                 Regex("Color\\(0x[0-9A-Fa-f]{8}\\)").findAll(text)
@@ -49,7 +52,7 @@ class DesignInvariantTest {
 
     @Test
     fun `navigation uses motion tokens not springs`() {
-        val offenders = sources("ui")
+        val offenders = (sources("ui") + sources("ui/apps"))
             .filter { it.readText().contains("spring") }
             .map { it.name }
         assertTrue(
@@ -59,9 +62,19 @@ class DesignInvariantTest {
     }
 
     @Test
+    fun `mini-app registry is non-empty`() {
+        val offenders = sources("ui/apps")
+            .filter { it.name == "XuneApps.kt" }
+            .filter { !it.readText().contains("XuneMiniApp(\"calculator\"") }
+            .map { it.path }
+        assertTrue("XuneApps registry should ship utilities (canon §8)", offenders.isEmpty())
+    }
+
+    @Test
     fun `canon documents exist`() {
         assertTrue(File(repoRoot, "docs/zune-hd-ui-canon.md").exists())
         assertTrue(File(repoRoot, "docs/design-tokens.md").exists())
+        assertTrue(File(repoRoot, "docs/zcp-inventory.md").exists())
         assertTrue(File(repoRoot, "NOTICE.md").exists())
     }
 }

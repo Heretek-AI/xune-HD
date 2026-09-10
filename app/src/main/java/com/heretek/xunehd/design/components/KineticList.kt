@@ -4,15 +4,19 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -30,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +50,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Kinetic list with the Zune alphabet rail: faint letters alongside the list;
- * dragging or tapping the rail jumps the list and shows the big letter
- * overlay — the Zune HD "tap any of the letters ... and that pops up the
- * full alphabet" behavior, adapted to a direct-manipulation rail.
+ * dragging the rail jumps directly, and tapping a letter pops up the full
+ * A–Z index — "tap any of the letters ... and that pops up the full alphabet"
+ * (canon §3.5). The giant letter overlay confirms both paths.
  */
 @Composable
 fun <T> KineticList(
@@ -65,9 +70,22 @@ fun <T> KineticList(
     val letters = remember(items) {
         items.mapNotNull { letter(it) }.distinct().sorted()
     }
+    val present = remember(letters) { letters.toSet() }
 
+    var indexOpen by remember { mutableStateOf(false) }
     var draggingLetter by remember { mutableStateOf<Char?>(null) }
     val overlayAlpha = remember { Animatable(0f) }
+
+    fun jumpTo(letterChar: Char) {
+        draggingLetter = letterChar
+        scope.launch { overlayAlpha.snapTo(1f) }
+        val index = items.indexOfFirst { letter(it) == letterChar }
+        if (index >= 0) scope.launch { listState.scrollToItem(index) }
+        scope.launch {
+            delay(350)
+            overlayAlpha.animateTo(0f, XuneMotion.pivot())
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize().clipToBounds()) {
         LazyColumn(
@@ -85,11 +103,12 @@ fun <T> KineticList(
 
         if (letters.isNotEmpty()) {
             AlphabetRail(
-                letters = letters,
+                present = present,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
                     .width(18.dp),
+                onLetterTap = { indexOpen = true },
                 onLetterFocus = { letterChar ->
                     draggingLetter = letterChar
                     scope.launch { overlayAlpha.snapTo(1f) }
@@ -122,24 +141,88 @@ fun <T> KineticList(
                     modifier = Modifier.graphicsLayer { alpha = overlayAlpha.value },
                 )
             }
+
+            // The full A–Z index, canon §3.5.
+            AnimatedVisibility(
+                visible = indexOpen,
+                enter = fadeIn(XuneMotion.pivot()),
+                exit = fadeOut(XuneMotion.pivot()),
+            ) {
+                AlphabetIndex(
+                    present = present,
+                    onPick = { letterChar ->
+                        indexOpen = false
+                        jumpTo(letterChar)
+                    },
+                    onDismiss = { indexOpen = false },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+    }
+}
+
+/** The full A–Z index popup. Letters without content stay dim. */
+@Composable
+private fun AlphabetIndex(
+    present: Set<Char>,
+    onPick: (Char) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = LocalXuneColors.current
+    val alphabet = remember { ('A'..'Z').toList() + '#' }
+    Box(
+        modifier
+            .background(colors.background.copy(alpha = 0.96f))
+            .pointerInput(Unit) {
+                detectTapGestures { onDismiss() }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            alphabet.chunked(3).forEach { rowLetters ->
+                Row {
+                    rowLetters.forEach { letterChar ->
+                        Box(
+                            modifier = Modifier
+                                .size(width = 56.dp, height = 28.dp)
+                                .clickable(enabled = letterChar in present) { onPick(letterChar) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            BasicText(
+                                text = letterChar.toString(),
+                                style = TextStyle(
+                                    fontFamily = Selawik,
+                                    fontWeight = FontWeight.Light,
+                                    fontSize = XuneTokens.TYPE_CROSSBAR.sp,
+                                    color = if (letterChar in present) colors.textPrimary else colors.textInactive,
+                                    textAlign = TextAlign.Center,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun AlphabetRail(
-    letters: List<Char>,
+    present: Set<Char>,
     modifier: Modifier = Modifier,
+    onLetterTap: () -> Unit,
     onLetterFocus: (Char) -> Unit,
     onDragEnd: () -> Unit,
 ) {
     val colors = LocalXuneColors.current
     Column(modifier = modifier) {
-        letters.forEach { letterChar ->
+        present.sorted().forEach { letterChar ->
             Box(
                 modifier = Modifier
                     .weight(1f, fill = true)
-                    .clickable { onLetterFocus(letterChar) }
+                    .clickable { onLetterTap() }
                     .draggable(
                         state = rememberDraggableState { },
                         orientation = Orientation.Vertical,

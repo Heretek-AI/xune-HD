@@ -20,9 +20,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +33,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.heretek.xunehd.R
 import com.heretek.xunehd.data.repo.XuneSettings
 import com.heretek.xunehd.design.LocalXuneColors
@@ -38,16 +44,26 @@ import com.heretek.xunehd.design.XuneTokens
 import com.heretek.xunehd.design.components.AlbumArt
 import com.heretek.xunehd.design.components.DeviceCanvas
 import com.heretek.xunehd.design.components.EdgeCropText
+import com.heretek.xunehd.design.components.LockShade
 import com.heretek.xunehd.ui.components.MenuController
 import com.heretek.xunehd.ui.nav.XuneDestination
 import com.heretek.xunehd.ui.screens.AlbumDetailScreen
 import com.heretek.xunehd.ui.screens.ArtistDetailScreen
 import com.heretek.xunehd.ui.screens.GenreScreen
 import com.heretek.xunehd.ui.screens.HomePages
+import com.heretek.xunehd.ui.screens.InternetScreen
+import com.heretek.xunehd.ui.screens.MarketplaceScreen
+import com.heretek.xunehd.ui.screens.MiniAppScreen
 import com.heretek.xunehd.ui.screens.MusicScreen
 import com.heretek.xunehd.ui.screens.NowPlayingScreen
+import com.heretek.xunehd.ui.screens.PicturesScreen
+import com.heretek.xunehd.ui.screens.PodcastFeedScreen
+import com.heretek.xunehd.ui.screens.PodcastsScreen
 import com.heretek.xunehd.ui.screens.PlaylistDetailScreen
+import com.heretek.xunehd.ui.screens.RadioScreen
 import com.heretek.xunehd.ui.screens.SettingsScreen
+import com.heretek.xunehd.ui.screens.SocialScreen
+import com.heretek.xunehd.ui.screens.VideosScreen
 
 @Composable
 fun XuneRoot() {
@@ -55,6 +71,17 @@ fun XuneRoot() {
     val settings by graph.settingsFlow.collectAsState(initial = XuneSettings())
     val menus = remember { MenuController() }
     val activity = androidx.activity.compose.LocalActivity.current
+    var shaded by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Wake shade (canon §5): cover the UI after the app leaves the foreground.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) shaded = true
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     com.heretek.xunehd.design.XuneTheme(accent = settings.accent) {
         androidx.compose.runtime.CompositionLocalProvider(
@@ -71,6 +98,7 @@ fun XuneRoot() {
                         MiniPlayer(canvasWidth)
                     }
                     com.heretek.xunehd.ui.components.ContextMenuOverlay(menus)
+                    LockShade(visible = shaded, onUnlock = { shaded = false })
                 }
             }
         }
@@ -116,6 +144,15 @@ private fun NavHost(canvasWidth: Dp, canvasHeight: Dp) {
             is XuneDestination.PlaylistDetail -> PlaylistDetailScreen(destination.playlistId, canvasWidth)
             XuneDestination.NowPlaying -> NowPlayingScreen(canvasWidth)
             XuneDestination.Settings -> SettingsScreen(canvasWidth)
+            XuneDestination.Videos -> VideosScreen(canvasWidth)
+            XuneDestination.Pictures -> PicturesScreen(canvasWidth)
+            XuneDestination.Radio -> RadioScreen(canvasWidth)
+            XuneDestination.Podcasts -> PodcastsScreen(canvasWidth)
+            is XuneDestination.PodcastFeed -> PodcastFeedScreen(destination.feedId, canvasWidth)
+            XuneDestination.Marketplace -> MarketplaceScreen(canvasWidth)
+            XuneDestination.Social -> SocialScreen(canvasWidth)
+            XuneDestination.Internet -> InternetScreen(canvasWidth)
+            is XuneDestination.MiniApp -> MiniAppScreen(destination.appId, canvasWidth)
         }
     }
 }

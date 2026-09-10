@@ -68,6 +68,15 @@ the functional entries are `music` and `settings`; future pivots may join.
 - In long lists, faint letters run alongside the list (SlashGear).
 - Tap any letter → a full A–Z index pops up → pick a letter to jump.
 
+### 3.6 Apps (marketplace)
+- Official apps and games were delivered exclusively through the **Apps
+  section of Zune Marketplace** (Wikipedia, *List of Zune applications*).
+  There was no home-menu `apps` entry.
+- In Xune-HD the `marketplace` pivot's `apps` section lists installed
+  mini-apps plus the frozen official catalog (unavailable entries dim).
+- Mini-apps open fullscreen and return via the cropped header / system back
+  (the device used its physical home button). See §8.
+
 ## 4. Now Playing (the signature screen)
 
 Layout (from ITPro Today's walkthrough):
@@ -92,6 +101,9 @@ Ratings (tri-state heart, from the Zune desktop/HD family):
 - Heart = favorite (prioritized by Smart DJ/Quickplay).
 - Broken heart = dislike (skipped in shuffle).
 - Unrated = neutral.
+- Smart DJ honored ratings: hearts were prioritized and broken hearts
+  skipped when shuffling (Microsoft press release, Sept 15 2009). Xune-HD's
+  shuffle mirrors this on-device behavior.
 
 ## 5. Lock/wake behavior
 - Wake shows the user wallpaper behind a "software shade"; **slide the shade
@@ -112,9 +124,25 @@ Ratings (tri-state heart, from the Zune desktop/HD family):
 - Material default colors/typography leaking into screens.
 - Star ratings (Zune is heart-based, tri-state).
 
-## 8. Reference library
+## 8. Mini-app platform (Xune-HD)
+- Apps open fullscreen: no MiniPlayer; no crossbar unless the app defines one.
+- The cropped header is the back affordance; system back also returns to
+  marketplace/apps (canon §3.6).
+- Apps must render correctly in device mode (480x272) and adaptive mode.
+- Xune-HD ships behavioral re-implementations only — no Microsoft code,
+  binaries or assets: utilities (calculator, notes, stopwatch, metronome,
+  alarm clock, calendar, level, piano, drum machine, chord finder, music
+  quiz, shuffle by album), games (solitaire, sudoku, hexic, reversi), and
+  offline mock shells for dead services (weather, twitter, facebook, email,
+  messenger, msn money, zune reader).
+
+## 9. Reference library
 - not-zune (desktop) design-system skill + extracted Zune assets (MIT).
 - ZuneRedux/zune-hd-apps — original HD app archive (design reference only).
+  The corpus's NX container, Authenticode signature, manifest records and
+  AES-ECB-encrypted payload are documented in `docs/zcp-inventory.md`
+  (regenerable via `tools/zcp_inventory.py`). Metadata only; binaries are
+  never bundled or shipped.
 - spidersandmoths/ZuneArtistImages — recreated catalog.zune.net semantics.
 - zuneupdate.com — community resource server (resources.zune.net).
 - BillyOutlast/MusicIn2001 — behavioral spec only (Research-Only license).

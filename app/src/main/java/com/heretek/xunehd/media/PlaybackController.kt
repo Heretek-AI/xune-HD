@@ -165,22 +165,29 @@ class PlaybackController(
         val queueNow = _queue.value
         if (queueNow.isEmpty()) return
 
-        val newOrder = if (enabled) {
-            val rest = baseOrder.filter { it.mediaId != current?.mediaId }.shuffled()
-            listOfNotNull(current) + rest
-        } else {
+        if (!enabled) {
             val rest = baseOrder.filter { it.mediaId != current?.mediaId }
-            if (current != null && baseOrder.contains(current)) {
+            val newOrder = if (current != null && baseOrder.contains(current)) {
                 baseOrder
             } else {
                 listOfNotNull(current) + rest
             }
+            _queue.value = newOrder
+            player.setMediaItems(newOrder.map { it.toMediaItem() }, 0, 0L)
+            player.prepare()
+            if (_isPlaying.value) player.play()
+            return
         }
 
-        _queue.value = newOrder
-        player.setMediaItems(newOrder.map { it.toMediaItem() }, 0, 0L)
-        player.prepare()
-        if (_isPlaying.value) player.play()
+        // Smart DJ (canon §4): hearts prioritized, broken hearts skipped.
+        scope.launch {
+            val ratings = quickplay.ratings()
+            val newOrder = smartShuffleOrder(baseOrder, ratings, _nowPlaying.value)
+            _queue.value = newOrder
+            player.setMediaItems(newOrder.map { it.toMediaItem() }, 0, 0L)
+            player.prepare()
+            if (_isPlaying.value) player.play()
+        }
     }
 
     fun cycleRepeat() {
@@ -210,6 +217,25 @@ class PlaybackController(
     }
 
     companion object {
+        /**
+         * Smart DJ ordering (canon §4): the current track leads, hearted
+         * tracks follow, then unrated; broken-heart tracks are skipped.
+         */
+        fun smartShuffleOrder(
+            base: List<Track>,
+            ratings: Map<Long, Int>,
+            current: Track?,
+        ): List<Track> {
+            val (broken, rest) = base.partition { ratings[it.mediaId] == Rating.BROKEN.value }
+            val (hearted, neutral) = rest.partition { ratings[it.mediaId] == Rating.HEART.value }
+            val lead = current?.let { c -> rest.firstOrNull { it.mediaId == c.mediaId } }
+            return buildList {
+                if (lead != null) add(lead)
+                addAll(hearted.filter { it.mediaId != lead?.mediaId }.shuffled())
+                addAll(neutral.filter { it.mediaId != lead?.mediaId }.shuffled())
+            }
+        }
+
         fun audioManager(context: Context): AudioManager =
             context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }

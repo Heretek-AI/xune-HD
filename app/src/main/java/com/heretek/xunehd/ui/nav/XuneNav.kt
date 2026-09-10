@@ -21,6 +21,17 @@ sealed interface XuneDestination {
     data class PlaylistDetail(val playlistId: Long) : XuneDestination
     data object NowPlaying : XuneDestination
     data object Settings : XuneDestination
+    // Media pivots (canon §3.1, Phase 5 surfaces).
+    data object Videos : XuneDestination
+    data object Pictures : XuneDestination
+    data object Radio : XuneDestination
+    data object Podcasts : XuneDestination
+    data class PodcastFeed(val feedId: Long) : XuneDestination
+    data object Marketplace : XuneDestination
+    data object Social : XuneDestination
+    data object Internet : XuneDestination
+    // Mini-app platform (canon §8).
+    data class MiniApp(val appId: String) : XuneDestination
 }
 
 class XuneNav {

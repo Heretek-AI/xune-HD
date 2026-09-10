@@ -58,6 +58,9 @@ class QuickplayRepository(private val db: XuneDatabase) {
 
     fun ratingOf(mediaId: Long): Flow<Rating> = db.ratingDao().ratingOf(mediaId).map { Rating.from(it ?: 0) }
 
+    /** Bulk ratings for Smart DJ-style shuffle ordering (canon §4). */
+    suspend fun ratings(): Map<Long, Int> = db.ratingDao().all().associate { it.mediaId to it.rating }
+
     suspend fun setRating(mediaId: Long, rating: Rating) {
         if (rating == Rating.NONE) {
             db.ratingDao().clear(mediaId)

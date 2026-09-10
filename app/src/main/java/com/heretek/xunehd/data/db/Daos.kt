@@ -88,6 +88,13 @@ interface TrackDao {
     )
     fun artistRows(): Flow<List<ArtistRow>>
 
+    @Query(
+        "SELECT artistId AS artistId, artist AS artist, COUNT(DISTINCT albumId) AS albumCount, " +
+            "COUNT(*) AS trackCount FROM tracks WHERE genre IN (:genres) AND artistId != :excludeArtistId " +
+            "GROUP BY artistId ORDER BY trackCount DESC, artist COLLATE NOCASE LIMIT :limit"
+    )
+    suspend fun relatedArtistRows(excludeArtistId: Long, genres: List<String>, limit: Int): List<ArtistRow>
+
     @Query("SELECT genre AS genre, COUNT(*) AS trackCount FROM tracks GROUP BY genre ORDER BY genre COLLATE NOCASE")
     fun genreRows(): Flow<List<GenreRow>>
 
@@ -111,6 +118,9 @@ interface RatingDao {
 
     @Query("SELECT * FROM ratings WHERE rating = :rating")
     suspend fun tracksWithRating(rating: Int): List<RatingEntity>
+
+    @Query("SELECT * FROM ratings")
+    suspend fun all(): List<RatingEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun set(entity: RatingEntity)
@@ -196,4 +206,109 @@ interface ArtistImageDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun put(entity: ArtistImageEntity)
+}
+
+@Dao
+interface NoteDao {
+    @Query("SELECT * FROM notes ORDER BY modifiedAt DESC")
+    fun all(): Flow<List<NoteEntity>>
+
+    @Insert
+    suspend fun insert(note: NoteEntity): Long
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface AppointmentDao {
+    @Query("SELECT * FROM appointments ORDER BY startAt")
+    fun all(): Flow<List<AppointmentEntity>>
+
+    @Query("SELECT * FROM appointments WHERE startAt BETWEEN :from AND :to ORDER BY startAt")
+    suspend fun inRange(from: Long, to: Long): List<AppointmentEntity>
+
+    @Insert
+    suspend fun insert(a: AppointmentEntity): Long
+
+    @Query("DELETE FROM appointments WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface AlarmDao {
+    @Query("SELECT * FROM alarms ORDER BY hour, minute")
+    fun all(): Flow<List<AlarmEntity>>
+
+    @Query("SELECT * FROM alarms WHERE id = :id")
+    suspend fun byId(id: Long): AlarmEntity?
+
+    @Insert
+    suspend fun insert(a: AlarmEntity): Long
+
+    @Query("UPDATE alarms SET enabled = :enabled WHERE id = :id")
+    suspend fun setEnabled(id: Long, enabled: Boolean)
+
+    @Query("DELETE FROM alarms WHERE id = :id")
+    suspend fun delete(id: Long)
+}
+
+@Dao
+interface RadioDao {
+    @Query("SELECT * FROM radio_stations ORDER BY isPreset DESC, frequencyKhz")
+    fun all(): Flow<List<RadioStationEntity>>
+
+    @Query("SELECT COUNT(*) FROM radio_stations")
+    suspend fun count(): Int
+
+    @Insert
+    suspend fun insert(s: RadioStationEntity): Long
+
+    @Query("DELETE FROM radio_stations WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("UPDATE radio_stations SET lastPlayedAt = :ts WHERE id = :id")
+    suspend fun touch(id: Long, ts: Long)
+}
+
+@Dao
+interface PodcastDao {
+    @Query("SELECT * FROM podcast_feeds ORDER BY subscribedAt DESC")
+    fun feeds(): Flow<List<PodcastFeedEntity>>
+
+    @Query("SELECT * FROM podcast_feeds WHERE id = :id")
+    suspend fun feed(id: Long): PodcastFeedEntity?
+
+    @Insert
+    suspend fun insertFeed(f: PodcastFeedEntity): Long
+
+    @Query("DELETE FROM podcast_feeds WHERE id = :id")
+    suspend fun deleteFeed(id: Long)
+
+    @Query("SELECT * FROM podcast_episodes WHERE feedId = :feedId ORDER BY pubAt DESC")
+    fun episodesFor(feedId: Long): Flow<List<PodcastEpisodeEntity>>
+
+    @Query("SELECT * FROM podcast_episodes WHERE id = :id")
+    suspend fun episode(id: Long): PodcastEpisodeEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEpisode(e: PodcastEpisodeEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEpisodes(es: List<PodcastEpisodeEntity>)
+
+    @Query("UPDATE podcast_episodes SET positionMs = :pos WHERE id = :id")
+    suspend fun setPosition(id: Long, pos: Long)
+
+    @Query("UPDATE podcast_episodes SET played = 1 WHERE id = :id")
+    suspend fun markPlayed(id: Long)
+}
+
+@Dao
+interface GameScoreDao {
+    @Query("SELECT * FROM game_scores WHERE game = :game ORDER BY score DESC LIMIT :limit")
+    fun top(game: String, limit: Int = 10): Flow<List<GameScoreEntity>>
+
+    @Insert
+    suspend fun insert(score: GameScoreEntity): Long
 }

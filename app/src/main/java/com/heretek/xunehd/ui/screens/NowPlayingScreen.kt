@@ -199,6 +199,11 @@ fun NowPlayingScreen(canvasWidth: Dp) {
                         EdgeCropText(
                             text = current.title,
                             fontSize = XuneTokens.TYPE_NOW_TITLE.dp,
+                            // Canon §4: the song title tappable → the album's track list.
+                            modifier = Modifier.clickable {
+                                poke()
+                                graph.nav.push(XuneDestination.Album(current.albumId))
+                            },
                         )
                         EdgeCropText(
                             text = current.artist,

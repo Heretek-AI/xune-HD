@@ -15,3 +15,6 @@ captures/
 
 # Logs
 *.log
+
+# Reverse-engineering corpus (never commit Microsoft binaries)
+review/

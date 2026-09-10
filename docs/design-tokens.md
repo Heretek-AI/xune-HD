@@ -55,4 +55,11 @@ in screens are an invariant violation.
 - Screen margins: 16 (edges), 24 (crossbar leading).
 - Crossbar strip height: 34.
 - List row height: 40; album grid tile: 92 with 8 gutter.
+- Mini-app tiles (marketplace > apps): 92, shared with album tile.
+- Podcast / radio station rows: 40.
+- Piano key: 24 wide x 72 high (white); black key 14 x 44.
+- Radio dial: 96 tall; minor tick 8, major tick 16 (every 1 MHz).
+- Sudoku cell: 36; board gap 1 (block gap 4).
+- Playing card: 44 x 62 (corner radius 0).
+- Hexic hex radius: 14, board gap 4.
 - Corner radius: **0 everywhere.**

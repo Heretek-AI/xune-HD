@@ -28,6 +28,13 @@ class XuneGraph(
     val controller: PlaybackController,
     val nav: XuneNav,
     val artistImages: ArtistImageService,
+    val artistBios: com.heretek.xunehd.net.ArtistBioService,
+    val notes: com.heretek.xunehd.data.repo.NotesRepository,
+    val calendar: com.heretek.xunehd.data.repo.CalendarRepository,
+    val alarms: com.heretek.xunehd.data.repo.AlarmRepository,
+    val radio: com.heretek.xunehd.data.repo.RadioRepository,
+    val podcasts: com.heretek.xunehd.data.repo.PodcastRepository,
+    val games: com.heretek.xunehd.data.repo.GameRepository,
 )
 
 class XuneApp : Application() {
@@ -46,8 +53,18 @@ class XuneApp : Application() {
         val controller = PlaybackController(this, library, quickplay)
         val nav = XuneNav()
         val artistImages = ArtistImageService(this, db, settings)
+        val artistBios = com.heretek.xunehd.net.ArtistBioService(this)
+        val notes = com.heretek.xunehd.data.repo.NotesRepository(db)
+        val calendar = com.heretek.xunehd.data.repo.CalendarRepository(db)
+        val alarms = com.heretek.xunehd.data.repo.AlarmRepository(db)
+        val radio = com.heretek.xunehd.data.repo.RadioRepository(db)
+        val podcasts = com.heretek.xunehd.data.repo.PodcastRepository(db)
+        val games = com.heretek.xunehd.data.repo.GameRepository(db)
 
-        graph = XuneGraph(library, quickplay, settings, settings.settings, controller, nav, artistImages)
+        graph = XuneGraph(
+            library, quickplay, settings, settings.settings, controller, nav,
+            artistImages, artistBios, notes, calendar, alarms, radio, podcasts, games,
+        )
 
         appScope.launch {
             controller.connect()
@@ -65,5 +82,9 @@ class XuneApp : Application() {
                 settings.setLibraryScanned(true)
             }
         }
+
+        // Seed radio station defaults and register mini-apps (canon §8).
+        appScope.launch { radio.seedDefaultsIfEmpty() }
+        com.heretek.xunehd.ui.apps.XuneApps.all = com.heretek.xunehd.ui.apps.buildAppRegistry()
     }
 }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -26,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.heretek.xunehd.design.LocalXuneColors
 import com.heretek.xunehd.design.XuneTokens
 import com.heretek.xunehd.design.components.AlbumArt
@@ -159,8 +162,8 @@ fun AlbumDetailScreen(albumId: Long, canvasWidth: androidx.compose.ui.unit.Dp) {
 }
 
 /**
- * Artist detail: a crossbar of their albums and songs, mirroring the device's
- * artist page.
+ * Artist detail: the full device crossbar — albums · songs · bio · photos ·
+ * related (canon §4; TechCrunch 2009 documents the five pivots).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -170,25 +173,29 @@ fun ArtistDetailScreen(artistId: Long, canvasWidth: androidx.compose.ui.unit.Dp)
     val menus = LocalContextMenu.current
     var albums by remember { mutableStateOf<List<Album>>(emptyList()) }
     var tracks by remember { mutableStateOf<List<Track>>(emptyList()) }
+    var artistName by remember { mutableStateOf<String?>(null) }
+    var related by remember { mutableStateOf<List<com.heretek.xunehd.data.model.Artist>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
 
     LaunchedEffect(artistId) {
         tracks = graph.library.tracksByArtist(artistId)
         albums = graph.library.albumsByArtist(artistId)
+        artistName = tracks.firstOrNull()?.artist
+        related = graph.library.relatedArtists(artistId)
         loaded = true
     }
 
-    val title = tracks.firstOrNull()?.artist ?: "artist"
+    val title = artistName ?: "artist"
 
     DetailScaffold(title = title) {
         if (!loaded) return@DetailScaffold
         Column(Modifier.fillMaxSize()) {
             val pagerState = androidx.compose.foundation.pager.rememberPagerState(
                 initialPage = 0,
-                pageCount = { 2 },
+                pageCount = { 5 },
             )
             CrossbarBar(
-                labels = listOf("albums", "songs"),
+                labels = listOf("albums", "songs", "bio", "photos", "related"),
                 selected = pagerState.currentPage,
                 onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
             )
@@ -198,11 +205,130 @@ fun ArtistDetailScreen(artistId: Long, canvasWidth: androidx.compose.ui.unit.Dp)
             ) { page ->
                 when (page) {
                     0 -> ArtistAlbums(albums)
-                    else -> ArtistSongs(tracks, menus, graph)
+                    1 -> ArtistSongs(tracks, menus, graph)
+                    2 -> ArtistBio(artistName)
+                    3 -> ArtistPhotos(artistName)
+                    else -> ArtistRelated(related)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ArtistBio(artistName: String?) {
+    val graph = LocalXuneGraph.current
+    val colors = LocalXuneColors.current
+    if (artistName == null) return
+    var bio by remember(artistName) { mutableStateOf<String?>(null) }
+    var failed by remember(artistName) { mutableStateOf(false) }
+
+    LaunchedEffect(artistName) {
+        bio = graph.artistBios.bioFor(artistName)
+        failed = bio == null
+    }
+
+    val text = bio
+    when {
+        text != null -> Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            androidx.compose.foundation.text.BasicText(
+                text = text,
+                style = androidx.compose.ui.text.TextStyle(
+                    fontFamily = com.heretek.xunehd.design.Selawik,
+                    fontSize = XuneTokens.TYPE_LIST.sp,
+                    color = colors.textPrimary.copy(alpha = 0.9f),
+                    lineHeight = XuneTokens.ROW_HEIGHT.sp * 0.5f,
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = XuneTokens.EDGE.dp, vertical = 12.dp),
+            )
+        }
+        failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "no biography",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "loading…",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArtistPhotos(artistName: String?) {
+    val graph = LocalXuneGraph.current
+    var photo by remember(artistName) { mutableStateOf<java.io.File?>(null) }
+
+    LaunchedEffect(artistName) {
+        if (artistName != null) photo = graph.artistImages.backgroundFor(artistName)
+    }
+
+    if (photo != null) {
+        coil3.compose.AsyncImage(
+            model = android.net.Uri.fromFile(photo),
+            contentDescription = artistName,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
+        )
+    } else {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "no photos",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ArtistRelated(related: List<com.heretek.xunehd.data.model.Artist>) {
+    val graph = LocalXuneGraph.current
+    if (related.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "nothing related",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+        return
+    }
+    com.heretek.xunehd.design.components.KineticList(
+        items = related,
+        key = { it.artistId },
+        letter = { com.heretek.xunehd.design.components.firstLetterOf(it.name) },
+        rowContent = { artist, _ ->
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(
+                        onClick = { graph.nav.push(XuneDestination.Artist(artist.artistId)) },
+                        onLongClick = {},
+                    )
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                EdgeCropText(
+                    text = artist.name,
+                    fontSize = XuneTokens.TYPE_LIST.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

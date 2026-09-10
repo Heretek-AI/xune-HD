@@ -12,7 +12,7 @@ enum class Rating(val value: Int) {
 
 enum class RepeatMode { OFF, ALL, ONE }
 
-enum class PinKind { TRACK, ALBUM, ARTIST, PLAYLIST }
+enum class PinKind { TRACK, ALBUM, ARTIST, PLAYLIST, PICTURE, RADIO }
 
 data class Track(
     val mediaId: Long,

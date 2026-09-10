@@ -34,6 +34,13 @@ class LibraryRepository(
     suspend fun recentlyAdded(limit: Int = 24): List<Track> = db.trackDao().recentlyAdded(limit).map { it.toModel() }
     suspend fun search(q: String): List<Track> = db.trackDao().search(q).map { it.toModel() }
     suspend fun albumsByArtist(artistId: Long): List<Album> = db.trackDao().albumRowsByArtist(artistId).map { it.toAlbum() }
+
+    /** Artists sharing this artist's genres — the artist page's `related` pivot. */
+    suspend fun relatedArtists(artistId: Long): List<Artist> {
+        val genres = db.trackDao().tracksByArtist(artistId).map { it.genre }.distinct()
+        if (genres.isEmpty()) return emptyList()
+        return db.trackDao().relatedArtistRows(artistId, genres, 12).map { it.toArtist() }
+    }
     suspend fun trackCount(): Int = db.trackDao().count()
 
     suspend fun refresh(): MediaLibraryScanner.ScanResult {

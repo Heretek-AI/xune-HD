@@ -29,4 +29,20 @@ object XuneTokens {
     const val TYPE_LIST_SECONDARY = 11
     const val TYPE_CAPTION = 9
     const val TYPE_ALPHABET = 10
+
+    // Mini-apps & games (docs/design-tokens.md, geometry)
+    const val APP_TILE = 92
+    const val PIANO_KEY_W = 24
+    const val PIANO_KEY_H = 72
+    const val PIANO_BLACK_W = 14
+    const val PIANO_BLACK_H = 44
+    const val DIAL_HEIGHT = 96
+    const val DIAL_TICK_MINOR = 8
+    const val DIAL_TICK_MAJOR = 16
+    const val SUDOKU_CELL = 36
+    const val BOARD_GAP = 1
+    const val BOARD_BLOCK_GAP = 4
+    const val CARD_W = 44
+    const val CARD_H = 62
+    const val HEX_RADIUS = 14
 }
