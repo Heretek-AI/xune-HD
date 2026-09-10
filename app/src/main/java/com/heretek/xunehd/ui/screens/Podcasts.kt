@@ -143,6 +143,8 @@ fun PodcastsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val menus = LocalContextMenu.current
     val scope = rememberCoroutineScope()
     val feeds by graph.podcasts.feeds().collectAsState(initial = emptyList())
+    val episodes by graph.podcasts.episodesFlat().collectAsState(initial = emptyList())
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 0, pageCount = { 4 })
 
     DetailScaffold(title = "podcasts") {
         Column(Modifier.fillMaxSize()) {
@@ -187,40 +189,123 @@ fun PodcastsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
             ) {
                 EdgeCropText(text = "+ add feed by url", fontSize = XuneTokens.TYPE_LIST.dp, color = LocalXuneColors.current.accent)
             }
-            KineticList(
-                items = feeds,
-                key = { it.id },
-                letter = { firstLetterOf(it.title) },
-                rowContent = { feed, _ ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(XuneTokens.ROW_HEIGHT.dp)
-                            .combinedClickable(
-                                onClick = { graph.nav.push(XuneDestination.PodcastFeed(feed.id)) },
-                                onLongClick = {
-                                    menus.show(
-                                        title = feed.title,
-                                        actions = listOf(
-                                            MenuAction("remove") {
-                                                scope.launch { graph.podcasts.deleteFeed(feed.id) }
-                                            },
-                                        ),
-                                    )
-                                },
-                            )
-                            .padding(horizontal = XuneTokens.EDGE.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            EdgeCropText(text = feed.title, fontSize = XuneTokens.TYPE_LIST.dp)
-                            EdgeCropText(text = feed.description.take(60), fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
-                        }
-                    }
-                },
+            com.heretek.xunehd.design.components.CrossbarBar(
+                labels = listOf("audio", "video", "subscriptions", "episodes"),
+                selected = pagerState.currentPage,
+                onSelect = { idx -> scope.launch { pagerState.animateScrollToPage(idx) } },
             )
+            androidx.compose.foundation.pager.HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                when (page) {
+                    0 -> PodcastsFeedList(feeds, onOpen = { feed -> graph.nav.push(XuneDestination.PodcastFeed(feed.id)) })
+                    // 'video' is a placeholder on this build — we cannot distinguish
+                    // audio vs video podcasts reliably from RSS alone; surface the
+                    // same feeds as audio until MediaStore tagging exists.
+                    1 -> PodcastsFeedList(feeds, onOpen = { feed -> graph.nav.push(XuneDestination.PodcastFeed(feed.id)) })
+                    2 -> PodcastsFeedList(feeds, onOpen = { feed -> graph.nav.push(XuneDestination.PodcastFeed(feed.id)) })
+                    else -> PodcastEpisodeList(episodes, onPlay = { ep ->
+                        scope.launch {
+                            val track = com.heretek.xunehd.data.model.Track(
+                                mediaId = ep.episodeId,
+                                title = ep.title,
+                                artist = "",
+                                artistId = 0,
+                                album = ep.feedTitle,
+                                albumId = 0,
+                                genre = "podcast",
+                                durationMs = ep.durationMs,
+                                dateAdded = ep.pubAt,
+                                trackNumber = 0,
+                                year = "",
+                                uri = android.net.Uri.parse(ep.enclosureUrl),
+                            )
+                            graph.controller.play(listOf(track))
+                        }
+                    })
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun PodcastsFeedList(
+    feeds: List<com.heretek.xunehd.data.db.PodcastFeedEntity>,
+    onOpen: (com.heretek.xunehd.data.db.PodcastFeedEntity) -> Unit,
+) {
+    val menus = com.heretek.xunehd.ui.components.LocalContextMenu.current
+    val scope = rememberCoroutineScope()
+    val graph = com.heretek.xunehd.ui.LocalXuneGraph.current
+    if (feeds.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(text = "no feeds yet", fontSize = XuneTokens.TYPE_NOW_META.dp, alpha = 0.4f)
+        }
+        return
+    }
+    com.heretek.xunehd.design.components.KineticList(
+        items = feeds,
+        key = { it.id },
+        letter = { com.heretek.xunehd.design.components.firstLetterOf(it.title) },
+        rowContent = { feed, _ ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(
+                        onClick = { onOpen(feed) },
+                        onLongClick = {
+                            menus.show(
+                                title = feed.title,
+                                actions = listOf(
+                                    com.heretek.xunehd.ui.components.MenuAction("remove") {
+                                        scope.launch { graph.podcasts.deleteFeed(feed.id) }
+                                    },
+                                ),
+                            )
+                        },
+                    )
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    EdgeCropText(text = feed.title, fontSize = XuneTokens.TYPE_LIST.dp)
+                    EdgeCropText(text = feed.description.take(60), fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun PodcastEpisodeList(
+    episodes: List<com.heretek.xunehd.data.db.PodcastEpisodeFlat>,
+    onPlay: (com.heretek.xunehd.data.db.PodcastEpisodeFlat) -> Unit,
+) {
+    if (episodes.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(text = "no episodes", fontSize = XuneTokens.TYPE_NOW_META.dp, alpha = 0.4f)
+        }
+        return
+    }
+    com.heretek.xunehd.design.components.KineticList(
+        items = episodes,
+        key = { it.episodeId },
+        letter = { com.heretek.xunehd.design.components.firstLetterOf(it.title) },
+        rowContent = { ep, _ ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(onClick = { onPlay(ep) }, onLongClick = {})
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    EdgeCropText(text = ep.title, fontSize = XuneTokens.TYPE_LIST.dp)
+                    EdgeCropText(text = ep.feedTitle, fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -244,7 +329,7 @@ fun PodcastFeedScreen(feedId: Long, canvasWidth: androidx.compose.ui.unit.Dp) {
                             onClick = {
                                 scope.launch {
                                     val track = com.heretek.xunehd.data.model.Track(
-                                        mediaId = ep.id,
+                                mediaId = ep.id,
                                         title = ep.title,
                                         artist = "",
                                         artistId = 0,

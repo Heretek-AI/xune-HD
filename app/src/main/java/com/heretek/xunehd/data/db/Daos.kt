@@ -288,6 +288,18 @@ interface PodcastDao {
     @Query("SELECT * FROM podcast_episodes WHERE feedId = :feedId ORDER BY pubAt DESC")
     fun episodesFor(feedId: Long): Flow<List<PodcastEpisodeEntity>>
 
+    /**
+     * Flat list of every episode across all feeds, joined with the feed
+     * title — used by the Podcasts screen's "episodes" pivot (canon §3.6).
+     */
+    @Query(
+        "SELECT e.id AS episodeId, e.feedId, e.title, e.pubAt, e.durationMs, e.enclosureUrl, " +
+            "e.played, e.positionMs, f.title AS feedTitle " +
+            "FROM podcast_episodes e JOIN podcast_feeds f ON e.feedId = f.id " +
+            "ORDER BY e.pubAt DESC"
+    )
+    fun episodesFlat(): Flow<List<com.heretek.xunehd.data.db.PodcastEpisodeFlat>>
+
     @Query("SELECT * FROM podcast_episodes WHERE id = :id")
     suspend fun episode(id: Long): PodcastEpisodeEntity?
 

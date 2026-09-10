@@ -2,6 +2,8 @@ package com.heretek.xunehd.ui.screens
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -209,7 +211,7 @@ fun ArtistDetailScreen(artistId: Long, canvasWidth: androidx.compose.ui.unit.Dp)
                     1 -> ArtistSongs(tracks, menus, graph)
                     2 -> ArtistBio(artistName)
                     3 -> ArtistPhotos(artistName)
-                    else -> ArtistRelated(related)
+                    else -> ArtistRelated(related, artistName)
                 }
             }
         }
@@ -275,34 +277,83 @@ private fun ArtistPhotos(artistName: String?) {
         if (artistName != null) photo = graph.artistImages.backgroundFor(artistName)
     }
 
-    if (photo != null) {
-        coil3.compose.AsyncImage(
-            model = android.net.Uri.fromFile(photo),
-            contentDescription = artistName,
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
-    } else {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            EdgeCropText(
-                text = "no photos",
-                fontSize = XuneTokens.TYPE_NOW_META.dp,
-                alpha = 0.4f,
+    // The Zune HD's artist page showed multiple band photos from zune.net.
+    // catalog.zune.net is gone, so we surface a single available photo (the
+    // wallpaper pulled from MusicBrainz) and an honest caption explaining
+    // where the rest would have come from.
+    Column(Modifier.fillMaxSize().padding(XuneTokens.EDGE.dp)) {
+        if (photo != null) {
+            coil3.compose.AsyncImage(
+                model = android.net.Uri.fromFile(photo),
+                contentDescription = artistName,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
             )
+            EdgeCropText(
+                text = artistName ?: "",
+                fontSize = XuneTokens.TYPE_NOW_TITLE.dp,
+                color = LocalXuneColors.current.textPrimary,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            EdgeCropText(
+                text = "photos from catalog.zune.net (frozen 2012)",
+                fontSize = XuneTokens.TYPE_CAPTION.dp,
+                color = LocalXuneColors.current.textSecondary,
+                alpha = 0.6f,
+            )
+        } else {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                EdgeCropText(
+                    text = "no photos — enable artist photos in settings",
+                    fontSize = XuneTokens.TYPE_NOW_META.dp,
+                    alpha = 0.4f,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ArtistRelated(related: List<com.heretek.xunehd.data.model.Artist>) {
+private fun ArtistRelated(related: List<com.heretek.xunehd.data.model.Artist>, artistName: String? = null) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val graph = LocalXuneGraph.current
     if (related.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // The Zune HD surfaced 'similar artists' from Last.fm + your friends'
+        // listening history. We have neither offline, so the empty state
+        // points the user at MusicBrainz, which the XuneSocial community used
+        // as a fallback for related-artist data.
+        Column(
+            Modifier.fillMaxSize().padding(XuneTokens.EDGE.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+        ) {
             EdgeCropText(
-                text = "nothing related",
+                text = "no related artists yet.",
                 fontSize = XuneTokens.TYPE_NOW_META.dp,
-                alpha = 0.4f,
+                color = LocalXuneColors.current.textSecondary,
             )
+            EdgeCropText(
+                text = "your zune would have drawn these from the social feed and last.fm similarity. without those signals, the only related artists we can show are the ones who share genres with this one in your library — a thin slice.",
+                fontSize = XuneTokens.TYPE_CAPTION.dp,
+                color = LocalXuneColors.current.textSecondary,
+                alpha = 0.6f,
+            )
+            if (artistName != null) {
+                val url = "https://musicbrainz.org/artist/" + (artistName.replace(" ", "%20")) + "?query="
+                EdgeCropText(
+                    text = "open musicbrainz for “$artistName”",
+                    fontSize = XuneTokens.TYPE_NOW_META.dp,
+                    color = LocalXuneColors.current.accent,
+                    modifier = Modifier
+                        .pointerInput(artistName) {
+                            detectTapGestures(onTap = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                runCatching { context.startActivity(intent) }
+                            })
+                        }
+                        .padding(vertical = 6.dp),
+                )
+            }
         }
         return
     }

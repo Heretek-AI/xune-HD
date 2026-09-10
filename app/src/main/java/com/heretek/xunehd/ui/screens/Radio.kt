@@ -60,12 +60,13 @@ fun RadioScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     var dialKhz by remember { mutableStateOf(current?.frequencyKhz ?: 98700) }
 
     DetailScaffold(title = "radio") {
-        val colors = LocalXuneColors.current
-        Column(Modifier.fillMaxSize().padding(XuneTokens.EDGE.dp)) {
-            // Dial
+        Column(Modifier.fillMaxSize()) {
+            val colors = LocalXuneColors.current
+            // Dial sits at the top across all pivots.
             Box(
                 Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = XuneTokens.EDGE.dp, vertical = 8.dp)
                     .height(XuneTokens.DIAL_HEIGHT.dp)
                     .background(colors.elevated),
             ) {
@@ -99,96 +100,140 @@ fun RadioScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                 )
                 BasicText(
                     text = formatDial(dialKhz),
-                    style = TextStyle(fontFamily = Selawik, fontSize = XuneTokens.TYPE_NOW_META.sp, color = LocalXuneColors.current.textPrimary),
+                    style = TextStyle(fontFamily = Selawik, fontSize = XuneTokens.TYPE_NOW_META.sp, color = colors.textPrimary),
                     modifier = Modifier.align(Alignment.BottomStart).padding(XuneTokens.EDGE.dp / 2),
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                EdgeCropText(
-                    text = "tune in",
-                    fontSize = XuneTokens.TYPE_LIST.dp,
-                    color = LocalXuneColors.current.accent,
-                    modifier = Modifier.combinedClickable(
-                        onClick = {
-                            val match = stations.firstOrNull { it.frequencyKhz == dialKhz }
-                                ?: stations.firstOrNull { it.streamUrl.isNotBlank() }
-                            if (match != null) {
-                                current = match
-                                playStation(graph, match)
-                                scope.launch { graph.radio.touch(match.id) }
-                            }
-                        },
-                        onLongClick = {},
-                    ),
-                )
-                Spacer(Modifier.weight(1f))
-                EdgeCropText(
-                    text = "+ station",
-                    fontSize = XuneTokens.TYPE_LIST.dp,
-                    color = LocalXuneColors.current.accent,
-                    modifier = Modifier.combinedClickable(
-                        onClick = {
-                            menus.showPrompt("add station", "name|url") { text ->
-                                val parts = text.split("|")
-                                if (parts.size >= 2) {
-                                    scope.launch {
-                                        graph.radio.add(
-                                            RadioStationEntity(
-                                                name = parts[0].trim().ifBlank { "stream" },
-                                                frequencyKhz = dialKhz,
-                                                streamUrl = parts[1].trim(),
-                                                isPreset = false,
-                                                lastPlayedAt = 0,
-                                            ),
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                        onLongClick = {},
-                    ),
-                )
-            }
-            KineticList(
-                items = stations,
-                key = { it.id },
-                letter = { firstLetterOf(it.name) },
-                rowContent = { s, _ ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(XuneTokens.ROW_HEIGHT.dp)
-                            .combinedClickable(
-                                onClick = {
-                                    current = s
-                                    dialKhz = s.frequencyKhz.coerceAtLeast(87500)
-                                    playStation(graph, s)
-                                    scope.launch { graph.radio.touch(s.id) }
-                                },
-                                onLongClick = {
-                                    menus.show(
-                                        title = s.name,
-                                        actions = listOf(
-                                            MenuAction("remove") {
-                                                scope.launch { graph.radio.delete(s.id) }
-                                            },
-                                        ),
-                                    )
-                                },
-                            )
-                            .padding(horizontal = XuneTokens.EDGE.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            EdgeCropText(text = s.name, fontSize = XuneTokens.TYPE_LIST.dp)
-                            EdgeCropText(text = formatDial(s.frequencyKhz), fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
-                        }
-                    }
-                },
+            val fmStations = stations.filter { !it.isPreset && it.frequencyKhz > 0 }
+            val hdStations = stations.filter { it.isPreset }
+            // 'presets' pivot = top 5 most-recently-played (canon §3.6).
+            val presetStations = stations
+                .filter { it.lastPlayedAt > 0 }
+                .sortedByDescending { it.lastPlayedAt }
+                .take(5)
+            val pivotBuckets = listOf(fmStations, hdStations, presetStations)
+            val pivotLabels = listOf("FM", "HD", "presets")
+            val radioPagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 0, pageCount = { 3 })
+            com.heretek.xunehd.design.components.CrossbarBar(
+                labels = pivotLabels,
+                selected = radioPagerState.currentPage,
+                onSelect = { i -> scope.launch { radioPagerState.animateScrollToPage(i) } },
             )
+            androidx.compose.foundation.pager.HorizontalPager(state = radioPagerState, modifier = Modifier.fillMaxSize()) { page ->
+                val pivotList = pivotBuckets.getOrNull(page) ?: emptyList()
+                Column(Modifier.fillMaxSize()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = XuneTokens.EDGE.dp, vertical = 4.dp)) {
+                        EdgeCropText(
+                            text = "tune in",
+                            fontSize = XuneTokens.TYPE_LIST.dp,
+                            color = LocalXuneColors.current.accent,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    val match = stations.firstOrNull { it.frequencyKhz == dialKhz }
+                                        ?: stations.firstOrNull { it.streamUrl.isNotBlank() }
+                                    if (match != null) {
+                                        current = match
+                                        playStation(graph, match)
+                                        scope.launch { graph.radio.touch(match.id) }
+                                    }
+                                },
+                                onLongClick = {},
+                            ),
+                        )
+                        Spacer(Modifier.weight(1f))
+                        EdgeCropText(
+                            text = "+ station",
+                            fontSize = XuneTokens.TYPE_LIST.dp,
+                            color = LocalXuneColors.current.accent,
+                            modifier = Modifier.combinedClickable(
+                                onClick = {
+                                    menus.showPrompt("add station", "name|url") { text ->
+                                        val parts = text.split("|")
+                                        if (parts.size >= 2) {
+                                            scope.launch {
+                                                graph.radio.add(
+                                                    RadioStationEntity(
+                                                        name = parts[0].trim().ifBlank { "stream" },
+                                                        frequencyKhz = dialKhz,
+                                                        streamUrl = parts[1].trim(),
+                                                        isPreset = false,
+                                                        lastPlayedAt = 0,
+                                                    ),
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                onLongClick = {},
+                            ),
+                        )
+                    }
+                    RadioStationList(
+                        stations = pivotList,
+                        current = current,
+                        onStation = { s ->
+                            current = s
+                            dialKhz = s.frequencyKhz.coerceAtLeast(87500)
+                            playStation(graph, s)
+                            scope.launch { graph.radio.touch(s.id) }
+                        },
+                        onLongPress = { s ->
+                            menus.show(
+                                title = s.name,
+                                actions = listOf(
+                                    MenuAction("remove") {
+                                        scope.launch { graph.radio.delete(s.id) }
+                                    },
+                                ),
+                            )
+                        },
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+private fun RadioStationList(
+    stations: List<RadioStationEntity>,
+    current: RadioStationEntity?,
+    onStation: (RadioStationEntity) -> Unit,
+    onLongPress: (RadioStationEntity) -> Unit,
+) {
+    if (stations.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "no stations here",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+        return
+    }
+    KineticList(
+        items = stations,
+        key = { it.id },
+        letter = { firstLetterOf(it.name) },
+        rowContent = { s, _ ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(
+                        onClick = { onStation(s) },
+                        onLongClick = { onLongPress(s) },
+                    )
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    EdgeCropText(text = s.name, fontSize = XuneTokens.TYPE_LIST.dp, color = if (s.id == current?.id) LocalXuneColors.current.accent else LocalXuneColors.current.textPrimary)
+                    EdgeCropText(text = formatDial(s.frequencyKhz), fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                }
+            }
+        },
+    )
 }
 
 private fun playStation(graph: com.heretek.xunehd.XuneGraph, station: RadioStationEntity) {

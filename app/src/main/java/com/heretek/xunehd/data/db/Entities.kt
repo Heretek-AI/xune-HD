@@ -142,6 +142,19 @@ data class PodcastEpisodeEntity(
     val positionMs: Long,
 )
 
+/** Read-only projection: episode + its parent feed title, for the "episodes" pivot. */
+data class PodcastEpisodeFlat(
+    val episodeId: Long,
+    val feedId: Long,
+    val title: String,
+    val pubAt: Long,
+    val durationMs: Long,
+    val enclosureUrl: String,
+    val played: Boolean,
+    val positionMs: Long,
+    val feedTitle: String,
+)
+
 /** Mini-game high score (solitaire, sudoku, hexic, reversi). */
 @Entity(tableName = "game_scores", indices = [Index("game"), Index("playedAt")])
 data class GameScoreEntity(

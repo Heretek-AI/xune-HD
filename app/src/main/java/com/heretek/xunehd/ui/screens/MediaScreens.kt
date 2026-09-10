@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -51,6 +52,7 @@ import com.heretek.xunehd.design.LocalXuneColors
 import com.heretek.xunehd.design.Selawik
 import com.heretek.xunehd.design.XuneTokens
 import com.heretek.xunehd.design.components.AlbumArt
+import com.heretek.xunehd.design.components.CrossbarBar
 import com.heretek.xunehd.design.components.EdgeCropText
 import com.heretek.xunehd.design.components.firstLetterOf
 import com.heretek.xunehd.design.components.KineticList
@@ -64,14 +66,19 @@ import kotlinx.coroutines.withContext
 /*                          Videos                                */
 /* ============================================================ */
 
-data class VideoItem(val id: Long, val title: String, val artist: String, val uri: Uri)
+data class VideoItem(val id: Long, val title: String, val artist: String, val uri: Uri, val bucket: String)
 
+private enum class VideoPivot { ALL, MOVIES, TV, MUSIC_VIDEOS }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun VideosScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val graph = LocalXuneGraph.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var videos by remember { mutableStateOf<List<VideoItem>>(emptyList()) }
     var playing by remember { mutableStateOf<VideoItem?>(null) }
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 0, pageCount = { 4 })
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -83,6 +90,7 @@ fun VideosScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     MediaStore.Video.Media.TITLE,
                     MediaStore.Video.Media.ARTIST,
                     MediaStore.Video.Media.DISPLAY_NAME,
+                    MediaStore.Video.Media.BUCKET_DISPLAY_NAME,
                 ),
                 null, null, "${MediaStore.Video.Media.DATE_ADDED} DESC LIMIT 200",
             )
@@ -90,12 +98,15 @@ fun VideosScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                 val idCol = c.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                 val titleCol = c.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
                 val artistCol = c.getColumnIndexOrThrow(MediaStore.Video.Media.ARTIST)
+                val bucketCol = c.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
                 while (c.moveToNext()) {
+                    val id = c.getLong(idCol)
                     list += VideoItem(
-                        id = c.getLong(idCol),
+                        id = id,
                         title = c.getString(titleCol) ?: "untitled",
                         artist = c.getString(artistCol) ?: "",
-                        uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, c.getLong(idCol)),
+                        uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id),
+                        bucket = c.getString(bucketCol) ?: "",
                     )
                 }
             }
@@ -108,81 +119,205 @@ fun VideosScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
         VideoPlayerScreen(cur) { playing = null }
         return
     }
-    DetailScaffold(title = "videos") {
-        KineticList(
-            items = videos,
-            key = { it.id },
-            letter = { firstLetterOf(it.title) },
-            rowContent = { v, _ ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(XuneTokens.ROW_HEIGHT.dp)
-                        .combinedClickable(onClick = { playing = v }, onLongClick = {})
-                        .padding(horizontal = XuneTokens.EDGE.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        EdgeCropText(text = v.title, fontSize = XuneTokens.TYPE_LIST.dp)
-                        EdgeCropText(text = v.artist, fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
-                    }
-                }
-            },
-        )
-    }
-}
 
-@Composable
-private fun VideoPlayerScreen(item: VideoItem, onExit: () -> Unit) {
-    val context = LocalContext.current
-    val player = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
-    DisposableEffect(item.id) {
-        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(item.uri))
-        player.prepare()
-        player.play()
-        onDispose { player.release() }
-    }
-    DetailScaffold(title = "video") {
-        Box(Modifier.fillMaxSize()) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    android.view.SurfaceView(ctx).also { player.setVideoSurface(it.holder.surface) }
-                },
+    // Bucket-name heuristics — MediaStore does not reliably expose category,
+    // so we partition by substring match against the bucket display name.
+    val movies = videos.filter { it.bucket.contains("movie", ignoreCase = true) || it.bucket.contains("film", ignoreCase = true) }
+    val tv = videos.filter { it.bucket.contains("tv", ignoreCase = true) || it.bucket.contains("show", ignoreCase = true) || it.bucket.contains("series", ignoreCase = true) }
+    val music = videos.filter { it.bucket.contains("music", ignoreCase = true) && !it.bucket.contains("movie", ignoreCase = true) }
+    val buckets = listOf(videos, movies, tv, music)
+    val pivotLabels = listOf("all", "movies", "tv", "music videos")
+
+    DetailScaffold(title = "videos") {
+        Column(Modifier.fillMaxSize()) {
+            CrossbarBar(
+                labels = pivotLabels,
+                selected = pagerState.currentPage,
+                onSelect = { idx -> scope.launch { pagerState.animateScrollToPage(idx) } },
             )
-            EdgeCropText(
-                text = "<- back",
-                fontSize = XuneTokens.TYPE_LIST.dp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .combinedClickable(onClick = onExit, onLongClick = {}),
-                color = LocalXuneColors.current.accent,
-            )
-            BasicText(
-                text = item.title,
-                style = TextStyle(fontFamily = Selawik, fontSize = XuneTokens.TYPE_NOW_META.sp, color = LocalXuneColors.current.textPrimary),
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
-            )
+            androidx.compose.foundation.pager.HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                VideoPivot.values()[page].let { pivot ->
+                    VideoListContent(
+                        videos = buckets[pivot.ordinal],
+                        onPlay = { playing = it },
+                    )
+                }
+            }
         }
     }
 }
 
-/* ============================================================ */
-/*                         Pictures                                */
-/* ============================================================ */
+@Composable
+private fun VideoListContent(videos: List<VideoItem>, onPlay: (VideoItem) -> Unit) {
+    if (videos.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "no videos here",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+        return
+    }
+    KineticList(
+        items = videos,
+        key = { it.id },
+        letter = { firstLetterOf(it.title) },
+        rowContent = { v, _ ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(onClick = { onPlay(v) }, onLongClick = {})
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    EdgeCropText(text = v.title, fontSize = XuneTokens.TYPE_LIST.dp)
+                    EdgeCropText(text = v.artist, fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                }
+            }
+        },
+    )
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun VideoPlayerScreen(item: VideoItem, onExit: () -> Unit) {
+    val context = LocalContext.current
+    val player = remember { androidx.media3.exoplayer.ExoPlayer.Builder(context).build() }
+    var positionMs by remember { mutableStateOf(0L) }
+    var durationMs by remember { mutableStateOf(0L) }
+    var isPlaying by remember { mutableStateOf(true) }
+    DisposableEffect(item.id) {
+        player.setMediaItem(androidx.media3.common.MediaItem.fromUri(item.uri))
+        player.prepare()
+        player.play()
+        val poll = kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
+            try {
+                while (true) {
+                    positionMs = player.currentPosition.coerceAtLeast(0)
+                    durationMs = if (player.duration > 0) player.duration else 0
+                    isPlaying = player.isPlaying
+                    kotlinx.coroutines.delay(250)
+                }
+            } catch (_: kotlinx.coroutines.CancellationException) {
+                // cancelled by onDispose below
+            }
+        }
+        onDispose {
+            poll.cancel()
+            player.release()
+        }
+    }
+    DetailScaffold(title = "video") {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        android.view.SurfaceView(ctx).also { player.setVideoSurface(it.holder.surface) }
+                    },
+                )
+                Box(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .combinedClickable(onClick = onExit, onLongClick = {}),
+                ) {
+                    EdgeCropText(text = "<- back", fontSize = XuneTokens.TYPE_LIST.dp, color = LocalXuneColors.current.accent)
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp),
+                ) {
+                    BasicText(
+                        text = item.title,
+                        style = TextStyle(fontFamily = Selawik, fontSize = XuneTokens.TYPE_NOW_META.sp, color = LocalXuneColors.current.textPrimary),
+                    )
+                }
+            }
+            // Transport + scrubber bar.
+            Column(Modifier.padding(horizontal = XuneTokens.EDGE.dp, vertical = 6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        Modifier
+                            .combinedClickable(
+                                onClick = {
+                                    if (player.isPlaying) player.pause() else player.play()
+                                },
+                                onLongClick = {},
+                            )
+                            .padding(end = 12.dp),
+                    ) {
+                        EdgeCropText(
+                            text = if (isPlaying) "pause" else "play",
+                            fontSize = XuneTokens.TYPE_NOW_META.dp,
+                            color = LocalXuneColors.current.accent,
+                        )
+                    }
+                    EdgeCropText(
+                        text = "${positionMs / 1000}s / ${if (durationMs > 0) durationMs / 1000 else "?"}s",
+                        fontSize = XuneTokens.TYPE_CAPTION.dp,
+                        color = LocalXuneColors.current.textSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                androidx.compose.foundation.layout.Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .background(LocalXuneColors.current.tile)
+                        .combinedClickable(
+                            onClick = {},
+                            onLongClick = {},
+                        ),
+                ) {
+                    val frac = if (durationMs > 0) (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                    Box(
+                        Modifier
+                            .height(6.dp)
+                            .fillMaxWidth(frac)
+                            .background(LocalXuneColors.current.accent),
+                    )
+                }
+            }
+        }
+    }
+}
 
 data class PictureBucket(val name: String, val items: List<PictureItem>)
-data class PictureItem(val id: Long, val displayName: String, val uri: Uri)
+data class PictureItem(val id: Long, val displayName: String, val uri: Uri, val dateTaken: Long)
 
+private enum class PicturePivot { ALL, ALBUMS, DATE_TAKEN, FAVORITES }
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
     val graph = LocalXuneGraph.current
+    val scope = rememberCoroutineScope()
     var buckets by remember { mutableStateOf<List<PictureBucket>>(emptyList()) }
+    var flat by remember { mutableStateOf<List<PictureItem>>(emptyList()) }
     var selectedBucket by remember { mutableStateOf<PictureBucket?>(null) }
     var viewerIndex by remember { mutableStateOf(0) }
-    val scope = rememberCoroutineScope()
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = 0, pageCount = { 4 })
+    val pinned by graph.quickplay.pins().collectAsState(initial = emptyList())
+    val favoriteItems = remember(pinned, flat) {
+        pinned.filter { it.kind == com.heretek.xunehd.data.model.PinKind.PICTURE }
+            .mapNotNull { card ->
+                val uri = card.subLabel.takeIf { it.startsWith("content://") || it.startsWith("file://") }
+                    ?: return@mapNotNull null
+                PictureItem(
+                    id = card.refId,
+                    displayName = card.label,
+                    uri = android.net.Uri.parse(uri),
+                    dateTaken = 0L,
+                )
+            }
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -193,6 +328,7 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     MediaStore.Images.Media._ID,
                     MediaStore.Images.Media.DISPLAY_NAME,
                     MediaStore.Images.Media.BUCKET_DISPLAY_NAME,
+                    MediaStore.Images.Media.DATE_TAKEN,
                 ),
                 null, null, "${MediaStore.Images.Media.DATE_ADDED} DESC LIMIT 500",
             )
@@ -200,26 +336,29 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                 val idCol = c.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
                 val nameCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
                 val bucketCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                val dateCol = c.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
                 while (c.moveToNext()) {
                     val id = c.getLong(idCol)
                     val item = PictureItem(
                         id = id,
                         displayName = c.getString(nameCol) ?: "untitled",
                         uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id),
+                        dateTaken = c.getLong(dateCol),
                     )
                     val bucket = c.getString(bucketCol) ?: "unknown"
                     byBucket.getOrPut(bucket) { mutableListOf() } += item
                 }
             }
             buckets = byBucket.map { (k, v) -> PictureBucket(k, v) }
+            flat = buckets.flatMap { it.items }.sortedByDescending { it.dateTaken }
         }
     }
 
     val viewing = selectedBucket
     if (viewing != null) {
-        val pagerState = rememberPagerState(initialPage = viewerIndex.coerceAtMost(viewing.items.lastIndex), pageCount = { viewing.items.size })
+        val pagerStateBucket = rememberPagerState(initialPage = viewerIndex.coerceAtMost(viewing.items.lastIndex), pageCount = { viewing.items.size })
         Box(Modifier.fillMaxSize().background(LocalXuneColors.current.background)) {
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { p ->
+            HorizontalPager(state = pagerStateBucket, modifier = Modifier.fillMaxSize()) { p ->
                 val item = viewing.items[p]
                 AsyncImage(
                     model = item.uri,
@@ -234,7 +373,7 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     .padding(8.dp)
                     .combinedClickable(
                         onClick = {
-                            val item = viewing.items[pagerState.currentPage]
+                            val item = viewing.items[pagerStateBucket.currentPage]
                             scope.launch { graph.quickplay.pin(com.heretek.xunehd.data.model.PinKind.PICTURE, item.id, item.displayName, item.uri.toString(), 0) }
                         },
                         onLongClick = {},
@@ -251,43 +390,140 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
 
     DetailScaffold(title = "pictures") {
         Column(Modifier.fillMaxSize()) {
-            buckets.forEach { bucket ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(XuneTokens.ROW_HEIGHT.dp)
-                        .combinedClickable(
-                            onClick = { selectedBucket = bucket; viewerIndex = 0 },
-                            onLongClick = {},
-                        )
-                        .padding(horizontal = XuneTokens.EDGE.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        EdgeCropText(text = bucket.name, fontSize = XuneTokens.TYPE_LIST.dp)
-                        EdgeCropText(text = "${bucket.items.size} photos", fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+            CrossbarBar(
+                labels = listOf("all", "albums", "date taken", "favorites"),
+                selected = pagerState.currentPage,
+                onSelect = { idx -> scope.launch { pagerState.animateScrollToPage(idx) } },
+            )
+            androidx.compose.foundation.pager.HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                when (PicturePivot.values()[page]) {
+                    PicturePivot.ALL -> PictureListContent(
+                        pictures = flat,
+                        onPicture = { selectedBucket = PictureBucket("all", flat); viewerIndex = 0 },
+                    )
+                    PicturePivot.ALBUMS -> Column {
+                        buckets.forEach { bucket ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(XuneTokens.ROW_HEIGHT.dp)
+                                    .combinedClickable(
+                                        onClick = { selectedBucket = bucket; viewerIndex = 0 },
+                                        onLongClick = {},
+                                    )
+                                    .padding(horizontal = XuneTokens.EDGE.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    EdgeCropText(text = bucket.name, fontSize = XuneTokens.TYPE_LIST.dp)
+                                    EdgeCropText(text = "${bucket.items.size} photos", fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                                }
+                            }
+                        }
                     }
+                    PicturePivot.DATE_TAKEN -> PictureListContent(
+                        pictures = flat,
+                        onPicture = { selectedBucket = PictureBucket("date taken", flat); viewerIndex = 0 },
+                    )
+                    PicturePivot.FAVORITES -> PictureListContent(
+                        pictures = favoriteItems,
+                        onPicture = { /* tapping a favorite reopens in viewer via subLabel URI */ },
+                    )
                 }
             }
         }
     }
 }
 
-/* ============================================================ */
+@Composable
+private fun PictureListContent(pictures: List<PictureItem>, onPicture: (PictureItem) -> Unit) {
+    if (pictures.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            EdgeCropText(
+                text = "no pictures here",
+                fontSize = XuneTokens.TYPE_NOW_META.dp,
+                alpha = 0.4f,
+            )
+        }
+        return
+    }
+    KineticList(
+        items = pictures,
+        key = { it.id },
+        letter = { firstLetterOf(it.displayName) },
+        rowContent = { p, _ ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(XuneTokens.ROW_HEIGHT.dp)
+                    .combinedClickable(onClick = { onPicture(p) }, onLongClick = {})
+                    .padding(horizontal = XuneTokens.EDGE.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    EdgeCropText(text = p.displayName, fontSize = XuneTokens.TYPE_LIST.dp)
+                    EdgeCropText(text = "photo", fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
+                }
+            }
+        },
+    )
+}
+
 /*                          Internet                                */
 /* ============================================================ */
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun InternetScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val context = LocalContext.current
     var url by remember { mutableStateOf("https://duckduckgo.com") }
     var currentUrl by remember { mutableStateOf(url) }
     var input by remember(url) { mutableStateOf(url) }
+    var canBack by remember { mutableStateOf(false) }
+    var canForward by remember { mutableStateOf(false) }
+    val bookmarks = remember { mutableStateListOf<String>() }
+    val history = remember { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<WebView?>(null) }
+
+    fun navigate(to: String) {
+        val candidate = if (to.startsWith("http")) to else "https://$to"
+        url = candidate
+        currentUrl = candidate
+        input = candidate
+        webViewRef.value?.loadUrl(candidate)
+        if (history.lastOrNull() != candidate) history.add(candidate)
+    }
 
     DetailScaffold(title = "internet") {
         Column(Modifier.fillMaxSize()) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(XuneTokens.EDGE.dp)) {
+                // Back / forward in-page navigation (canon §3.6).
+                Box(
+                    Modifier.combinedClickable(
+                        enabled = canBack,
+                        onClick = { webViewRef.value?.goBack() },
+                        onLongClick = {},
+                    ).padding(end = 6.dp),
+                ) {
+                    EdgeCropText(
+                        text = "<",
+                        fontSize = XuneTokens.TYPE_NOW_META.dp,
+                        color = if (canBack) LocalXuneColors.current.accent else LocalXuneColors.current.textInactive,
+                    )
+                }
+                Box(
+                    Modifier.combinedClickable(
+                        enabled = canForward,
+                        onClick = { webViewRef.value?.goForward() },
+                        onLongClick = {},
+                    ).padding(end = 6.dp),
+                ) {
+                    EdgeCropText(
+                        text = ">",
+                        fontSize = XuneTokens.TYPE_NOW_META.dp,
+                        color = if (canForward) LocalXuneColors.current.accent else LocalXuneColors.current.textInactive,
+                    )
+                }
                 BasicTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -300,38 +536,60 @@ fun InternetScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     Modifier
                         .padding(start = 6.dp)
                         .combinedClickable(
-                            onClick = {
-                                val candidate = if (input.startsWith("http")) input else "https://$input"
-                                currentUrl = candidate
-                                url = candidate
-                                webViewRef.value?.loadUrl(candidate)
-                            },
+                            onClick = { navigate(input) },
                             onLongClick = {},
                         ),
                 ) {
                     EdgeCropText(text = "go", fontSize = XuneTokens.TYPE_LIST.dp, color = LocalXuneColors.current.accent)
                 }
+                Box(
+                    Modifier
+                        .padding(start = 6.dp)
+                        .combinedClickable(
+                            onClick = { navigate(currentUrl); if (bookmarks.lastOrNull() != currentUrl) bookmarks.add(currentUrl) },
+                            onLongClick = {},
+                        ),
+                ) {
+                    EdgeCropText(text = "*", fontSize = XuneTokens.TYPE_LIST.dp, color = LocalXuneColors.current.accent)
+                }
             }
             AndroidView(
-                modifier = Modifier.fillMaxSize().background(LocalXuneColors.current.background),
+                modifier = Modifier.weight(1f).background(LocalXuneColors.current.background),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true
                         loadUrl(url)
                         webViewRef.value = this
+                        // Refresh back/forward availability whenever the page changes.
+                        this.webViewClient = object : android.webkit.WebViewClient() {
+                            override fun onPageStarted(view: WebView?, u: String?, favicon: android.graphics.Bitmap?) {
+                                canBack = view?.canGoBack() == true
+                                canForward = view?.canGoForward() == true
+                                u?.let { currentUrl = it; input = it }
+                            }
+                            override fun onPageFinished(view: WebView?, u: String?) {
+                                canBack = view?.canGoBack() == true
+                                canForward = view?.canGoForward() == true
+                            }
+                        }
                     }
                 },
-                update = { wv ->
-                    wv.setBackgroundColor(android.graphics.Color.BLACK)
-                },
+                update = { wv -> wv.setBackgroundColor(android.graphics.Color.BLACK) },
             )
+            if (bookmarks.isNotEmpty() || history.isNotEmpty()) {
+                BasicText(
+                    text = "bookmarks: " + bookmarks.joinToString(" · "),
+                    style = TextStyle(
+                        fontFamily = Selawik,
+                        fontSize = XuneTokens.TYPE_CAPTION.sp,
+                        color = LocalXuneColors.current.textSecondary,
+                    ),
+                    modifier = Modifier.padding(XuneTokens.EDGE.dp),
+                )
+            }
         }
     }
 }
-
-/* ============================================================ */
-/*                          Social                                */
-/* ============================================================ */
 
 data class MockPost(val author: String, val text: String, val when_: String)
 
@@ -366,10 +624,6 @@ fun SocialScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     }
 }
 
-/**
- * Fullscreen viewer for a single pinned picture (canon §3.2, Quickplay
- * surfaces). URI is the MediaStore / SAF content URI the user pinned.
- */
 @Composable
 fun PictureDetailScreen(uri: String) {
     DetailScaffold(title = "picture") {

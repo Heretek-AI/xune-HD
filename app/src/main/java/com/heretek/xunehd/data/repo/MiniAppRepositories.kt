@@ -5,6 +5,7 @@ import com.heretek.xunehd.data.db.AppointmentEntity
 import com.heretek.xunehd.data.db.GameScoreEntity
 import com.heretek.xunehd.data.db.NoteEntity
 import com.heretek.xunehd.data.db.PodcastEpisodeEntity
+import com.heretek.xunehd.data.db.PodcastEpisodeFlat
 import com.heretek.xunehd.data.db.PodcastFeedEntity
 import com.heretek.xunehd.data.db.RadioStationEntity
 import com.heretek.xunehd.data.db.XuneDatabase
@@ -68,6 +69,7 @@ class PodcastRepository(private val db: XuneDatabase) {
     suspend fun addFeed(f: PodcastFeedEntity): Long = db.podcastDao().insertFeed(f)
     suspend fun deleteFeed(id: Long) = db.podcastDao().deleteFeed(id)
     fun episodes(feedId: Long): Flow<List<PodcastEpisodeEntity>> = db.podcastDao().episodesFor(feedId)
+    fun episodesFlat(): Flow<List<PodcastEpisodeFlat>> = db.podcastDao().episodesFlat()
     suspend fun episode(id: Long): PodcastEpisodeEntity? = db.podcastDao().episode(id)
     suspend fun addEpisodes(es: List<PodcastEpisodeEntity>) = db.podcastDao().insertEpisodes(es)
     suspend fun setPosition(id: Long, pos: Long) = db.podcastDao().setPosition(id, pos)
