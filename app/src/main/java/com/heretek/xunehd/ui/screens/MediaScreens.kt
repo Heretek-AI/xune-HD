@@ -218,7 +218,7 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
     val viewing = selectedBucket
     if (viewing != null) {
         val pagerState = rememberPagerState(initialPage = viewerIndex.coerceAtMost(viewing.items.lastIndex), pageCount = { viewing.items.size })
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Box(Modifier.fillMaxSize().background(LocalXuneColors.current.background)) {
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { p ->
                 val item = viewing.items[p]
                 AsyncImage(
@@ -235,7 +235,7 @@ fun PicturesScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     .combinedClickable(
                         onClick = {
                             val item = viewing.items[pagerState.currentPage]
-                            scope.launch { graph.quickplay.pin(com.heretek.xunehd.data.model.PinKind.PICTURE, item.id, item.displayName, "", 0) }
+                            scope.launch { graph.quickplay.pin(com.heretek.xunehd.data.model.PinKind.PICTURE, item.id, item.displayName, item.uri.toString(), 0) }
                         },
                         onLongClick = {},
                     ),
@@ -313,7 +313,7 @@ fun InternetScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                 }
             }
             AndroidView(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
+                modifier = Modifier.fillMaxSize().background(LocalXuneColors.current.background),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         settings.javaScriptEnabled = true
@@ -362,6 +362,24 @@ fun SocialScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                     EdgeCropText(text = post.when_, fontSize = XuneTokens.TYPE_CAPTION.dp, color = LocalXuneColors.current.textSecondary)
                 }
             }
+        }
+    }
+}
+
+/**
+ * Fullscreen viewer for a single pinned picture (canon §3.2, Quickplay
+ * surfaces). URI is the MediaStore / SAF content URI the user pinned.
+ */
+@Composable
+fun PictureDetailScreen(uri: String) {
+    DetailScaffold(title = "picture") {
+        Box(Modifier.fillMaxSize().background(LocalXuneColors.current.background)) {
+            AsyncImage(
+                model = android.net.Uri.parse(uri),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }

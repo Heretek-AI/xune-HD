@@ -119,10 +119,9 @@ fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
             )
 
             SectionLabel("collection")
-            SettingsRow(
+            SettingsInfoRow(
                 label = "library location",
                 subLabel = "${graph.library.databasePath()}\n${trackCount ?: "…"} tracks from MediaStore.Audio (all indexed audio on the device)",
-                onClick = {},
             )
             SettingsRow(
                 label = if (importState) "importing…" else "import music",
@@ -145,10 +144,9 @@ fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
                 subLabel = "rebuild the library from device media",
                 onClick = { scope.launch { graph.library.refresh() } },
             )
-            SettingsRow(
+            SettingsInfoRow(
                 label = "scan status",
                 subLabel = scanStatusText(lastScanAt, lastScanResult, lastImportResult),
-                onClick = {},
             )
 
             SectionLabel("about")
@@ -161,7 +159,7 @@ fun SettingsScreen(canvasWidth: androidx.compose.ui.unit.Dp) {
             EdgeCropText(
                 text = "selawik stands in for zegoe (sil ofl). zune, zegoe and the zune hd are trademarks of microsoft; this is an independent homage.",
                 fontSize = XuneTokens.TYPE_CAPTION.dp,
-                alpha = 0.4f,
+                alpha = 0.08f,
                 modifier = Modifier.padding(horizontal = XuneTokens.EDGE.dp),
             )
         }
@@ -201,6 +199,24 @@ private fun SettingsRow(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .padding(horizontal = XuneTokens.EDGE.dp, vertical = 8.dp),
+    ) {
+        EdgeCropText(text = label, fontSize = XuneTokens.TYPE_LIST.dp)
+        EdgeCropText(
+            text = subLabel,
+            fontSize = XuneTokens.TYPE_LIST_SECONDARY.dp,
+            color = colors.textSecondary,
+        )
+    }
+}
+
+/** Non-tappable read-only row (e.g. "library location" — canonical info, not an action). */
+@Composable
+private fun SettingsInfoRow(label: String, subLabel: String) {
+    val colors = LocalXuneColors.current
+    Column(
+        Modifier
+            .fillMaxWidth()
             .padding(horizontal = XuneTokens.EDGE.dp, vertical = 8.dp),
     ) {
         EdgeCropText(text = label, fontSize = XuneTokens.TYPE_LIST.dp)

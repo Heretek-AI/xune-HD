@@ -55,7 +55,7 @@ fun CrossbarBar(
                     fontWeight = FontWeight.Light,
                     fontSize = XuneTokens.TYPE_CROSSBAR.sp,
                     color = color,
-                    letterSpacing = (-0.3).sp,
+                    letterSpacing = XuneTokens.LETTER_SPACING_CROSSBAR.sp,
                 ),
                 modifier = Modifier
                     .clickable(onClick = { onSelect(index) })

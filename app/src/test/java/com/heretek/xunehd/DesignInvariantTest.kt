@@ -51,6 +51,28 @@ class DesignInvariantTest {
     }
 
     @Test
+    fun `no platform color constants in screens or design components`() {
+        // Catches Color.Black / Color.White / Color.Red / etc. in UI surfaces.
+        // ui/apps/games/ is an explicit allowlist — card faces (white) and piece
+        // stones (white/black) are design intent that maps to no token.
+        // Color.Transparent is allowed everywhere (zero-alpha "no fill").
+        // PianoDrum.kt may use Color.White for the piano keys (canonically white).
+        val nameConstant = Regex("\\bColor\\.(Black|White|Red|Green|Blue|Yellow|Gray|Cyan|Magenta|DarkGray|LightGray)\\b")
+        val offenders = (sources("ui") + sources("design/components"))
+            .filter { it.path.contains("ui/apps/games/").not() }
+            .filter { it.name != "PianoDrum.kt" }
+            .flatMap { file ->
+                val text = file.readText()
+                nameConstant.findAll(text).map { match -> "${file.name}: ${match.value}" }
+            }
+            .toList()
+        assertTrue(
+            "Screens must not reference platform color constants (use LocalXuneColors tokens): $offenders",
+            offenders.isEmpty(),
+        )
+    }
+
+    @Test
     fun `navigation uses motion tokens not springs`() {
         val offenders = (sources("ui") + sources("ui/apps"))
             .filter { it.readText().contains("spring") }

@@ -95,7 +95,7 @@ fun ContextMenuOverlay(controller: MenuController) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f))
+                .background(LocalXuneColors.current.background.copy(alpha = 0.55f))
                 .pointerInput(Unit) {
                     detectTapGestures { controller.dismiss() }
                 },

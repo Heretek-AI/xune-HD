@@ -45,4 +45,19 @@ object XuneTokens {
     const val CARD_W = 44
     const val CARD_H = 62
     const val HEX_RADIUS = 14
+
+    // Letter-spacing tokens (sp). The Zune HD's "Zegoe" rendered with slight
+    // negative tracking; the 480x272 device canvas compounds it, so we keep
+    // these small. Apply via `letterSpacing = (-X).sp`.
+    const val LETTER_SPACING_EDGE = -0.5
+    const val LETTER_SPACING_HEADER = -1.0
+    const val LETTER_SPACING_CROSSBAR = -0.3
+
+    // Now Playing screensaver type scale (device-mode design units).
+    const val TYPE_SAVER_TITLE = 32
+    const val TYPE_SAVER_ARTIST = 20
+    const val TYPE_SAVER_ALBUM = 16
+
+    // Drag thresholds (px in device-mode design units).
+    const val SKIP_DRAG_PX = 24
 }

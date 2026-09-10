@@ -58,6 +58,7 @@ import com.heretek.xunehd.ui.screens.MiniAppScreen
 import com.heretek.xunehd.ui.screens.MusicScreen
 import com.heretek.xunehd.ui.screens.NowPlayingScreen
 import com.heretek.xunehd.ui.screens.PicturesScreen
+import com.heretek.xunehd.ui.screens.PictureDetailScreen
 import com.heretek.xunehd.ui.screens.PodcastFeedScreen
 import com.heretek.xunehd.ui.screens.PodcastsScreen
 import com.heretek.xunehd.ui.screens.PlaylistDetailScreen
@@ -75,10 +76,15 @@ fun XuneRoot() {
     var shaded by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Wake shade (canon §5): cover the UI after the app leaves the foreground.
+    // Wake shade (canon §5): cover the UI after the app leaves the foreground;
+    // clear the shade when the app returns to the foreground.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) shaded = true
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> shaded = true
+                Lifecycle.Event.ON_RESUME -> shaded = false
+                else -> Unit
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -161,6 +167,7 @@ private fun NavHost(canvasWidth: Dp, canvasHeight: Dp) {
             XuneDestination.Social -> SocialScreen(canvasWidth)
             XuneDestination.Internet -> InternetScreen(canvasWidth)
             is XuneDestination.MiniApp -> MiniAppScreen(destination.appId, canvasWidth)
+            is XuneDestination.PictureDetail -> PictureDetailScreen(destination.uri)
         }
     }
 }

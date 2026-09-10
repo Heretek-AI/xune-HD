@@ -120,6 +120,8 @@ class XuneApp : Application() {
 
         // Seed radio station defaults and register mini-apps (canon §8).
         appScope.launch { radio.seedDefaultsIfEmpty() }
-        com.heretek.xunehd.ui.apps.XuneApps.all = com.heretek.xunehd.ui.apps.buildAppRegistry()
+        // Touch XuneApps so its lazy registry is materialized before any UI
+        // looks it up; equivalent to the prior eager assignment.
+        com.heretek.xunehd.ui.apps.XuneApps.all.size
     }
 }

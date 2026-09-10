@@ -65,7 +65,7 @@ fun StaggerEntrance(
         label = "stagger",
     )
     LaunchedEffect(Unit) {
-        delay((index.coerceAtMost(30) * XuneMotion.STAGGER_MS).coerceAtMost(300))
+        delay(index * XuneMotion.STAGGER_MS)
         appeared = true
     }
     Box(

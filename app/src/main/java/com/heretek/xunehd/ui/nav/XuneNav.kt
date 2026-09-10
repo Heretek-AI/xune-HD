@@ -32,6 +32,8 @@ sealed interface XuneDestination {
     data object Internet : XuneDestination
     // Mini-app platform (canon §8).
     data class MiniApp(val appId: String) : XuneDestination
+    // A single pinned picture viewer — URI is stored in the pin's subLabel.
+    data class PictureDetail(val uri: String) : XuneDestination
 }
 
 class XuneNav {

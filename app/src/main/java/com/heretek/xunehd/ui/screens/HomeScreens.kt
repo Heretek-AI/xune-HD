@@ -111,7 +111,7 @@ fun HomeMenuScreen(canvasWidth: Dp) {
         EdgeCropText(
             text = "xune hd",
             fontSize = XuneTokens.TYPE_CROSSBAR.dp,
-            alpha = 0.4f,
+            alpha = 0.08f,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(start = XuneTokens.EDGE.dp, bottom = XuneTokens.EDGE.dp),
@@ -280,7 +280,10 @@ private fun openCard(graph: XuneGraph, scope: CoroutineScope, card: QuickplayCar
         PinKind.ALBUM -> graph.nav.push(XuneDestination.Album(card.refId))
         PinKind.ARTIST -> graph.nav.push(XuneDestination.Artist(card.refId))
         PinKind.PLAYLIST -> graph.nav.push(XuneDestination.PlaylistDetail(card.refId))
-        PinKind.PICTURE -> Unit
+        PinKind.PICTURE -> {
+            val uri = card.subLabel.takeIf { it.startsWith("content://") || it.startsWith("file://") }
+            if (uri != null) graph.nav.push(XuneDestination.PictureDetail(uri))
+        }
         PinKind.RADIO -> graph.nav.push(XuneDestination.Radio)
     }
 }

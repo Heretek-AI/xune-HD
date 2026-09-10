@@ -16,11 +16,11 @@ data class XuneMiniApp(
 )
 
 /**
- * The registry of installed mini-apps (canon §8). Built once at load time;
+ * The registry of installed mini-apps (canon §8). Built once at first access;
  * `byId` is used by the marketplace apps pivot and the destination router.
  */
 object XuneApps {
-    var all: List<XuneMiniApp> = emptyList()
+    val all: List<XuneMiniApp> by lazy { buildAppRegistry() }
 
     fun byId(id: String): XuneMiniApp? = all.firstOrNull { it.id == id }
 }
@@ -55,7 +55,7 @@ fun buildAppRegistry(): List<XuneMiniApp> = listOf(
     XuneMiniApp("messenger", "messenger", "networking", { com.heretek.xunehd.ui.apps.mocks.MessengerMock() }),
     XuneMiniApp("msnmoney", "msn money", "reading", { com.heretek.xunehd.ui.apps.mocks.MsnMoneyMock() }),
     XuneMiniApp("zunereader", "zune reader", "reading", { com.heretek.xunehd.ui.apps.mocks.ZuneReaderMock() }),
-    XuneMiniApp("social", "social", "social", { com.heretek.xunehd.ui.apps.mocks.SocialMock() }),
+    XuneMiniApp("zunesocial", "social", "social", { com.heretek.xunehd.ui.apps.mocks.SocialMock() }),
 )
 
 /** Mini-app scaffold: cropped-header back, fullscreen content. */

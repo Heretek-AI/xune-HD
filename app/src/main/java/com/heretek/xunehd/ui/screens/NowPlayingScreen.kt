@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val IDLE_SCREENSAVER_MS = 5_000L
-private const val SKIP_DRAG_THRESHOLD = 90f
+private const val SKIP_DRAG_THRESHOLD = XuneTokens.SKIP_DRAG_PX.toFloat()
 
 /**
  * The Zune HD Now Playing: a metadata card floating over artist photography.
@@ -363,9 +363,9 @@ private fun BackdropLayer(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.15f),
-                        0.55f to Color.Black.copy(alpha = 0.35f),
-                        1f to Color.Black.copy(alpha = 0.75f),
+                        0f to colors.background.copy(alpha = 0.15f),
+                        0.55f to colors.background.copy(alpha = 0.35f),
+                        1f to colors.background.copy(alpha = 0.75f),
                     ),
                 ),
         )
@@ -380,7 +380,7 @@ private fun BackdropLayer(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.25f)),
+                .background(colors.background.copy(alpha = 0.25f)),
         )
     }
 }
@@ -404,15 +404,15 @@ private fun ScreensaverLayer(track: Track, positionMs: Long, durationMs: Long) {
                 .graphicsLayer { translationY = drift }
                 .padding(start = XuneTokens.EDGE.dp, end = 80.dp),
         ) {
-            EdgeCropText(text = track.title, fontSize = 32.dp)
+            EdgeCropText(text = track.title, fontSize = XuneTokens.TYPE_SAVER_TITLE.dp)
             EdgeCropText(
                 text = track.artist,
-                fontSize = 20.dp,
+                fontSize = XuneTokens.TYPE_SAVER_ARTIST.dp,
                 alpha = 0.9f,
             )
             EdgeCropText(
                 text = track.album,
-                fontSize = 16.dp,
+                fontSize = XuneTokens.TYPE_SAVER_ALBUM.dp,
                 alpha = 0.7f,
             )
             EdgeCropText(
@@ -452,7 +452,7 @@ private fun TransportOverlay(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.68f))
+            .background(colors.background.copy(alpha = 0.68f))
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { onDismiss() })
             }

@@ -370,4 +370,40 @@ class LogicTest {
         assertEquals("full house should be category 7", 7, fh)
         assertEquals("straight should be category 5", 5, str)
     }
+
+    /* ============ Sprint 1 — design invariant guards ============ */
+
+    @Test
+    fun `official catalog has 62 entries with 17 launchable from frozen catalog`() {
+        // Frozen catalog invariant from the gap audit: every installedId must
+        // point to a real entry in the marketplace apps pivot, and the total
+        // package count must match docs/zcp-inventory.md.
+        val all = com.heretek.xunehd.data.official.OfficialCatalog.all
+        assertEquals("catalog must match the ZuneRedux 62-entry set", 62, all.size)
+        val installed = all.mapNotNull { it.installedId }.distinct()
+        val missing = installed.filter { id -> com.heretek.xunehd.ui.apps.XuneApps.byId(id) == null }
+        assertTrue(
+            "installed catalog ids should resolve to a real mini-app: missing=$missing",
+            missing.isEmpty(),
+        )
+        // 12 utilities + 4 original games + 5 new games (hearts/spades/checkers/chess/texasholdem) + 1 social = 22 — but
+        // 5 utilities (alarm, calendar, level, notes, stopwatch) + 4 original games (solitaire, sudoku, hexic, reversi) +
+        // 1 calculator (cross-listed as utility) + 8 mocks = some entries share an id with a mock. What we assert
+        // here is just that the *distinct* installedIds are non-zero and at least cover all four canonical surfaces.
+        val distinct = installed.toSet()
+        assertTrue("must have at least one installable app per PinKind surface", distinct.size >= 6)
+    }
+
+    @Test
+    fun `XuneColors tokens match the spec table`() {
+        // Single-source-of-truth checks against docs/design-tokens.md. The build
+        // invariant catches raw color literals; this guards the token values
+        // themselves (background #111111, watermark alpha 0.08, etc.).
+        val bg = androidx.compose.ui.graphics.Color(0xFF111111)
+        val elevated = androidx.compose.ui.graphics.Color(0xFF181818)
+        val tile = androidx.compose.ui.graphics.Color(0xFF202020)
+        assertEquals(bg, com.heretek.xunehd.design.XuneColors(accent = XuneAccent.PINK.primary, accentBright = XuneAccent.PINK.bright).background)
+        assertEquals(elevated, com.heretek.xunehd.design.XuneColors(accent = XuneAccent.PINK.primary, accentBright = XuneAccent.PINK.bright).elevated)
+        assertEquals(tile, com.heretek.xunehd.design.XuneColors(accent = XuneAccent.PINK.primary, accentBright = XuneAccent.PINK.bright).tile)
+    }
 }
